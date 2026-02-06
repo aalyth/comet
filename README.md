@@ -1,0 +1,2 @@
+# comet
+Distributed streaming broker.
