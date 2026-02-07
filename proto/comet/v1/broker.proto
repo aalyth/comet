@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package comet.v1;
+
+option go_package = "github.com/aalyth/comet/proto/comet/v1;cometv1";
+
+service BrokerService {
+  rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
+  rpc DeleteTopic(DeleteTopicRequest) returns (DeleteTopicResponse);
+  rpc ListTopics(ListTopicsRequest) returns (ListTopicsResponse);
+  rpc Produce(ProduceRequest) returns (ProduceResponse);
+  rpc Consume(ConsumeRequest) returns (stream ConsumeResponse);
+}
+
+message CreateTopicRequest {
+  string name = 1;
+  int32 partitions = 2;
+}
+
+message CreateTopicResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message DeleteTopicRequest {
+  string name = 1;
+}
+
+message DeleteTopicResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ListTopicsRequest {}
+
+message TopicInfo {
+  string name = 1;
+  int32 partitions = 2;
+}
+
+message ListTopicsResponse {
+  repeated TopicInfo topics = 1;
+}
+
+message ProduceRequest {
+  string topic = 1;
+  int32 partition = 2;
+  bytes key = 3;
+  bytes value = 4;
+}
+
+message ProduceResponse {
+  int64 offset = 1;
+  string error = 2;
+  int32 partition = 3;
+}
+
+message ConsumeRequest {
+  string topic = 1;
+  int32 partition = 2;
+  int64 offset = 3;
+}
+
+message Message {
+  int64 offset = 1;
+  bytes key = 2;
+  bytes value = 3;
+  int64 timestamp = 4;
+}
+
+message ConsumeResponse {
+  Message message = 1;
+  string error = 2;
+}
+
+message WalRecord {
+  int64 offset = 1;
+  bytes key = 2;
+  bytes value = 3;
+  int64 timestamp = 4;
+}
