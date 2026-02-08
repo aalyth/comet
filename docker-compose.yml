@@ -1,0 +1,22 @@
+services:
+  etcd:
+    image: gcr.io/etcd-development/etcd:v3.5.17
+    command:
+      - etcd
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+    ports:
+      - "2379:2379"
+
+  broker:
+    build: .
+    ports:
+      - "6174:6174"
+    command: ["-addr", ":6174", "-etcd", "etcd:2379"]
+    depends_on:
+      - etcd
+    volumes:
+      - comet-data:/data
+
+volumes:
+  comet-data:
