@@ -43,7 +43,6 @@ func (ok *offsetKey) etcdKey() string {
 	return fmt.Sprintf("%s%s/%s/%d", offsetKeyPrefix, ok.topic, ok.group, ok.partition)
 }
 
-// A concrete consumer group member and it's assigned partitions.
 type GroupMember struct {
 	ID         string
 	partitions []int32
@@ -64,7 +63,6 @@ func (m *GroupMember) setPartitions(partitions []int32) {
 	m.partitions = partitions
 }
 
-// Metadata about the whole consumer group for a given topic.
 type consumerGroup struct {
 	mu         sync.Mutex
 	members    map[string]*GroupMember
@@ -87,8 +85,10 @@ type pendingOffset struct {
 	offset    int64
 }
 
-// Manages all consumer groups over the different topics. Each client's offset
-// information is stored within etcd.
+// GroupManager manages all consumer groups over the different topics. Each
+// client's offset information is stored within etcd as a form of persistence,
+// but operations work directly over an in-memory cache, where other instances
+// get synchronized proactively (via etcd watchers).
 type GroupManager struct {
 	// In-memory cache of the information for each topic's consumer groups.
 	// Data is automatically updated via etcd watchers, i.e. when another
@@ -218,7 +218,6 @@ func (gm *GroupManager) Join(
 	return member, cleanup, nil
 }
 
-// GetOffset returns the committed offset for a partition in a consumer group.
 func (gm *GroupManager) GetOffset(topic, group string, partition int32) (int64, error) {
 	if gm.etcd != nil {
 		etcdKey := fmt.Sprintf(
@@ -239,7 +238,7 @@ func (gm *GroupManager) GetOffset(topic, group string, partition int32) (int64, 
 		return offset, nil
 	}
 
-	// In-memory mode: offsets start at 0.
+	// if we're in in-memory mode only, we directly start from 0
 	return 0, nil
 }
 
@@ -333,7 +332,6 @@ func (gm *GroupManager) rebalance(key groupKey, cg *consumerGroup) {
 	cg.notify = make(chan struct{})
 }
 
-// registerMember creates an etcd lease and puts the member key.
 func (gm *GroupManager) registerMember(gk groupKey, memberId string) error {
 	lease, err := gm.etcd.Grant(gm.ctx, leaseTtlSeconds)
 	if err != nil {
@@ -361,7 +359,7 @@ func (gm *GroupManager) registerMember(gk groupKey, memberId string) error {
 		}
 	}()
 
-	// Store cancel so cleanup can stop the keepalive.
+	// store cancel so cleanup can stop the keepalive
 	gm.mu.Lock()
 	cg := gm.groups[gk]
 	gm.mu.Unlock()
@@ -380,8 +378,7 @@ func (gm *GroupManager) registerMember(gk groupKey, memberId string) error {
 	return nil
 }
 
-// watchMembers watches the member key prefix in etcd and triggers rebalances
-// when members join or leave.
+// Watches over the memberKeyPrefix and rebalances when memers join/leave
 func (gm *GroupManager) watchMembers() {
 	defer gm.wg.Done()
 
@@ -472,7 +469,7 @@ func (gm *GroupManager) offsetFlusher() {
 	}
 }
 
-// Flush all pending offsets to `etcd` in a single transaction.
+// Flush all pending offsets to etcd in a single transaction.
 func (gm *GroupManager) flushOffsets() {
 	gm.pendingMu.Lock()
 	pending := gm.pendingOffsets
@@ -483,7 +480,7 @@ func (gm *GroupManager) flushOffsets() {
 		return
 	}
 
-	// Collect the latest offset per (group, topic, partition).
+	// collect only the latest offsets per (group, topic, partition)
 	latest := make(map[offsetKey]int64)
 	for key, offsets := range pending {
 		for _, po := range offsets {
@@ -494,13 +491,10 @@ func (gm *GroupManager) flushOffsets() {
 		}
 	}
 
-	// Write to etcd in a single batch.
+	// batch a single etcd operation for the offsets
 	ops := make([]clientv3.Op, 0, len(latest))
 	for ok, offset := range latest {
-		etcdKey := fmt.Sprintf(
-			"%s%s/%s/%d", offsetKeyPrefix, ok.topic, ok.group, ok.partition,
-		)
-		ops = append(ops, clientv3.OpPut(etcdKey, fmt.Sprintf("%d", offset)))
+		ops = append(ops, clientv3.OpPut(ok.etcdKey(), fmt.Sprintf("%d", offset)))
 	}
 
 	if len(ops) > 0 {
