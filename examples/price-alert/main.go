@@ -68,7 +68,7 @@ func (pa *PriceAlerter) consumePrice(msg *client.Message) {
 
 	changePct := ((update.Price - baseline) / baseline) * 100
 	if math.Abs(changePct) >= pa.threshold {
-		pa.logger.Error(
+		pa.logger.Warn(
 			"ALERT",
 			zap.String("symbol", update.Symbol),
 			zap.Float64("change_pct", changePct),
@@ -105,7 +105,7 @@ func main() {
 		threshold: getPriceAlertThreshold(),
 	}
 
-	cfg := client.DefaultConsumerConfig(addr, "price-alerts")
+	cfg := client.DefaultConsumerConfig(client.ParseAddresses(addr), "price-alerts")
 	cfg.Logger = logger
 	consumer, err := client.NewConsumer(cfg)
 	if err != nil {

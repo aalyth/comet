@@ -70,7 +70,7 @@ func newTestTopicProducer(
 ) *TopicProducer {
 	t.Helper()
 
-	cfg := DefaultProducerConfig(addr, topic, partitions)
+	cfg := DefaultProducerConfig([]string{addr}, topic, partitions)
 	cfg.BufferSize = 100
 	cfg.FlushInterval = 50 * time.Millisecond
 	cfg.BatchSize = 50
@@ -99,7 +99,7 @@ func newTestConsumer(
 ) *Consumer {
 	t.Helper()
 
-	cfg := DefaultConsumerConfig(addr, group)
+	cfg := DefaultConsumerConfig([]string{addr}, group)
 	cfg.PollInterval = 50 * time.Millisecond
 	cfg.ChannelBuffer = 100
 	cfg.BackoffMin = 10 * time.Millisecond

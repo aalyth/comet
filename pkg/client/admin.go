@@ -12,11 +12,16 @@ import (
 )
 
 type TopicInfo struct {
-	Name       string
-	Partitions int32
+	Name              string
+	Partitions        int32
+	ReplicationFactor int32
 }
 
-func CreateTopic(brokerAddress, name string, partitions int32) error {
+const (
+	defaultReplicationFactor = 1
+)
+
+func CreateTopic(brokerAddress, name string, partitions, replicationFactor int32) error {
 	conn, err := grpc.NewClient(
 		brokerAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -30,11 +35,16 @@ func CreateTopic(brokerAddress, name string, partitions int32) error {
 		}
 	}()
 
+	if replicationFactor <= 0 {
+		replicationFactor = defaultReplicationFactor
+	}
+
 	client := pb.NewBrokerServiceClient(conn)
 	resp, err := client.CreateTopic(
 		context.Background(), &pb.CreateTopicRequest{
-			Name:       name,
-			Partitions: partitions,
+			Name:              name,
+			Partitions:        partitions,
+			ReplicationFactor: replicationFactor,
 		},
 	)
 	if err != nil {
@@ -98,8 +108,9 @@ func ListTopics(brokerAddress string) ([]TopicInfo, error) {
 	topics := make([]TopicInfo, len(resp.Topics))
 	for i, t := range resp.Topics {
 		topics[i] = TopicInfo{
-			Name:       t.Name,
-			Partitions: t.Partitions,
+			Name:              t.Name,
+			Partitions:        t.Partitions,
+			ReplicationFactor: t.ReplicationFactor,
 		}
 	}
 	return topics, nil

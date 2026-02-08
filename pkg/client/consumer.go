@@ -1,8 +1,8 @@
 package client
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -20,9 +20,9 @@ type subscription struct {
 }
 
 // Consumer connects to a broker and consumes messages from topics using
-// consumer groups. The broker handles partition assignment and rebalancing
-// via the Subscribe RPC. If a topic does not yet exist the consumer waits
-// and retries with exponential backoff rather than returning an error.
+// consumer groups. It uses the poll-based Subscribe/Poll/Unsubscribe RPCs.
+// If a topic does not yet exist, the consumer waits and retries with
+// exponential backoff rather than returning an error.
 type Consumer struct {
 	config ConsumerConfig
 	conn   *grpc.ClientConn
@@ -43,17 +43,32 @@ func NewConsumer(config ConsumerConfig) (*Consumer, error) {
 	}
 	l := logger.Named("consumer")
 
-	conn, err := grpc.NewClient(
-		config.BrokerAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "connecting to broker")
+	addrs := config.BootstrapAddresses
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("no broker addresses configured")
+	}
+
+	var conn *grpc.ClientConn
+	var connErr error
+	for _, addr := range addrs {
+		c, err := grpc.NewClient(
+			addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			connErr = err
+			continue
+		}
+		conn = c
+		break
+	}
+	if conn == nil {
+		return nil, errors.Wrap(connErr, "connecting to broker")
 	}
 
 	l.Info(
 		"Consumer created",
-		zap.String("broker", config.BrokerAddress),
+		zap.String("broker", addrs[0]),
 		zap.String("group", config.Group),
 	)
 
@@ -69,8 +84,7 @@ func NewConsumer(config ConsumerConfig) (*Consumer, error) {
 
 // Subscribe starts consuming messages from the given topic using the
 // consumer group configured in ConsumerConfig. The handler is called for
-// each message received. If the topic doesn't exist yet the consumer will
-// wait and retry with backoff.
+// each message received.
 func (c *Consumer) Subscribe(topic string, handler MessageHandler) error {
 	ch, err := c.subscribe(topic)
 	if err != nil {
@@ -137,6 +151,53 @@ func (c *Consumer) Close() error {
 	return c.conn.Close()
 }
 
+// reconnect cycles through the configured bootstrap addresses and replaces
+// the current connection with the first one that succeeds. This is called
+// when the current broker becomes unreachable.
+func (c *Consumer) reconnect() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, addr := range c.config.BootstrapAddresses {
+		conn, err := grpc.NewClient(
+			addr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			continue
+		}
+
+		client := pb.NewBrokerServiceClient(conn)
+
+		// verify the connection is actually usable
+		_, err = client.Subscribe(
+			context.Background(),
+			&pb.SubscribeRequest{},
+		)
+
+		// We don't care about the response -- we just need the RPC to not
+		// fail with a transport error. Any application-level error means
+		// the broker is reachable.
+		if err != nil {
+			conn.Close()
+			continue
+		}
+
+		// success - swap out the old connection
+		oldConn := c.conn
+		c.conn = conn
+		c.client = client
+		if oldConn != nil {
+			oldConn.Close()
+		}
+
+		c.logger.Info("Reconnected to broker", zap.String("addr", addr))
+		return nil
+	}
+
+	return fmt.Errorf("no reachable bootstrap broker")
+}
+
 func (c *Consumer) subscribe(topic string) (chan *Message, error) {
 	c.mu.Lock()
 	if c.closed {
@@ -149,7 +210,13 @@ func (c *Consumer) subscribe(topic string) (chan *Message, error) {
 	}
 
 	subCloseCh := make(chan struct{})
-	cancelFn := func() { close(subCloseCh) }
+	cancelFn := func() {
+		select {
+		case <-subCloseCh:
+		default:
+			close(subCloseCh)
+		}
+	}
 
 	ch := make(chan *Message, c.config.ChannelBuffer)
 	sub := &subscription{
@@ -160,30 +227,87 @@ func (c *Consumer) subscribe(topic string) (chan *Message, error) {
 	c.mu.Unlock()
 
 	sub.wg.Add(1)
-	go c.consumeLoop(sub, topic, subCloseCh)
+	go c.pollLoop(sub, topic, subCloseCh)
 
 	c.logger.Info("Subscribed", zap.String("topic", topic), zap.String("group", c.config.Group))
 	return ch, nil
 }
 
-func (c *Consumer) consumeLoop(sub *subscription, topic string, stopCh <-chan struct{}) {
+func (c *Consumer) pollLoop(sub *subscription, topic string, stopCh <-chan struct{}) {
 	defer sub.wg.Done()
 
 	backoff := c.config.BackoffMin
+	var memberID string
+
 	for {
-		select {
-		case <-stopCh:
+		if isStopped(stopCh, c.closeCh) {
+			// unsubscribe from the group if we have a memberID
+			if memberID != "" {
+				c.client.Unsubscribe(
+					context.Background(), &pb.UnsubscribeRequest{
+						Topic:    topic,
+						Group:    c.config.Group,
+						MemberId: memberID,
+					},
+				)
+			}
 			return
-		case <-c.closeCh:
-			return
-		default:
 		}
 
-		stream, err := c.client.Subscribe(
-			newStopContext(stopCh, c.closeCh),
-			&pb.SubscribeRequest{
-				Topic: topic,
-				Group: c.config.Group,
+		// join the group if we don't have a memberID
+		if memberID == "" {
+			resp, err := c.client.Subscribe(
+				context.Background(),
+				&pb.SubscribeRequest{
+					Topic: topic,
+					Group: c.config.Group,
+				},
+			)
+			if err != nil {
+				if isStopped(stopCh, c.closeCh) {
+					return
+				}
+				c.logger.Warn(
+					"Failed subscribing, retrying",
+					zap.String("topic", topic),
+					zap.Error(err),
+					zap.Duration("backoff", backoff),
+				)
+				c.reconnect()
+				backoff = c.sleep(stopCh, backoff)
+				continue
+			}
+			if resp.Error != "" {
+				c.logger.Warn(
+					"Subscribe error, retrying",
+					zap.String("topic", topic),
+					zap.String("error", resp.Error),
+					zap.Duration("backoff", backoff),
+				)
+				backoff = c.sleep(stopCh, backoff)
+				continue
+			}
+
+			memberID = resp.MemberId
+			backoff = c.config.BackoffMin
+
+			c.logger.Debug(
+				"Joined group",
+				zap.String("topic", topic),
+				zap.String("memberID", memberID),
+				zap.Int32s("partitions", resp.Partitions),
+				zap.Int64("generation", resp.Generation),
+			)
+		}
+
+		// poll for messages
+		pollResp, err := c.client.Poll(
+			context.Background(),
+			&pb.PollRequest{
+				Topic:      topic,
+				Group:      c.config.Group,
+				MemberId:   memberID,
+				MaxRecords: c.config.MaxPollRecords,
 			},
 		)
 		if err != nil {
@@ -191,48 +315,39 @@ func (c *Consumer) consumeLoop(sub *subscription, topic string, stopCh <-chan st
 				return
 			}
 			c.logger.Warn(
-				"Failed subscribing, retrying",
+				"Poll failed, re-joining",
 				zap.String("topic", topic),
 				zap.Error(err),
-				zap.Duration("backoff", backoff),
 			)
+			c.reconnect()
+			memberID = ""
 			backoff = c.sleep(stopCh, backoff)
 			continue
 		}
 
-		c.logger.Debug("Stream opened", zap.String("topic", topic))
+		if pollResp.Error != "" {
+			c.logger.Warn(
+				"Poll error, re-joining",
+				zap.String("topic", topic),
+				zap.String("error", pollResp.Error),
+			)
+			memberID = ""
+			backoff = c.sleep(stopCh, backoff)
+			continue
+		}
 
-		for {
-			resp, err := stream.Recv()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				if isStopped(stopCh, c.closeCh) {
-					return
-				}
-				c.logger.Warn(
-					"Failed reading from stream, reconnecting",
-					zap.String("topic", topic),
-					zap.Error(err),
-				)
-				break
-			}
+		// the sever has already updated our partition assignments, so
+		// the next Poll will return the messages from this new set of
+		// partitions
+		if pollResp.Rebalance {
+			c.logger.Debug(
+				"Rebalance detected, continuing with updated partitions",
+				zap.String("topic", topic),
+				zap.Int64("generation", pollResp.Generation),
+			)
+		}
 
-			if resp.Error != "" {
-				c.logger.Warn(
-					"Server error, retrying",
-					zap.String("topic", topic),
-					zap.String("error", resp.Error),
-				)
-				break
-			}
-
-			msg := resp.Message
-			if msg == nil {
-				continue
-			}
-
+		for _, msg := range pollResp.Messages {
 			m := &Message{
 				Topic:     msg.Topic,
 				Partition: msg.Partition,
@@ -244,7 +359,6 @@ func (c *Consumer) consumeLoop(sub *subscription, topic string, stopCh <-chan st
 
 			select {
 			case sub.ch <- m:
-				// reset on successful receive
 				backoff = c.config.BackoffMin
 			case <-stopCh:
 				return
@@ -253,8 +367,15 @@ func (c *Consumer) consumeLoop(sub *subscription, topic string, stopCh <-chan st
 			}
 		}
 
-		// back off before reconnecting
-		backoff = c.sleep(stopCh, backoff)
+		if len(pollResp.Messages) == 0 {
+			select {
+			case <-time.After(c.config.PollInterval):
+			case <-stopCh:
+				return
+			case <-c.closeCh:
+				return
+			}
+		}
 	}
 }
 
@@ -273,46 +394,6 @@ func (c *Consumer) sleep(stopCh <-chan struct{}, backoff time.Duration) time.Dur
 		next = c.config.BackoffMax
 	}
 	return next
-}
-
-type stopContext struct {
-	stopCh  <-chan struct{}
-	closeCh <-chan struct{}
-}
-
-func newStopContext(stopCh, closeCh <-chan struct{}) *stopContext {
-	return &stopContext{stopCh: stopCh, closeCh: closeCh}
-}
-
-func (s *stopContext) Deadline() (time.Time, bool) {
-	return time.Time{}, false
-}
-
-func (s *stopContext) Value(any) any {
-	return nil
-}
-
-func (s *stopContext) Err() error {
-	select {
-	case <-s.stopCh:
-		return fmt.Errorf("subscription stopped")
-	case <-s.closeCh:
-		return fmt.Errorf("consumer closed")
-	default:
-		return nil
-	}
-}
-func (s *stopContext) Done() <-chan struct{} {
-	// Merge both channels into one.
-	ch := make(chan struct{})
-	go func() {
-		select {
-		case <-s.stopCh:
-		case <-s.closeCh:
-		}
-		close(ch)
-	}()
-	return ch
 }
 
 func isStopped(stopCh, closeCh <-chan struct{}) bool {

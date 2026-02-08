@@ -22,11 +22,12 @@ const (
 )
 
 type CreateTopicRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Partitions    int32                  `protobuf:"varint,2,opt,name=partitions,proto3" json:"partitions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Partitions        int32                  `protobuf:"varint,2,opt,name=partitions,proto3" json:"partitions,omitempty"`
+	ReplicationFactor int32                  `protobuf:"varint,3,opt,name=replication_factor,json=replicationFactor,proto3" json:"replication_factor,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CreateTopicRequest) Reset() {
@@ -69,6 +70,13 @@ func (x *CreateTopicRequest) GetName() string {
 func (x *CreateTopicRequest) GetPartitions() int32 {
 	if x != nil {
 		return x.Partitions
+	}
+	return 0
+}
+
+func (x *CreateTopicRequest) GetReplicationFactor() int32 {
+	if x != nil {
+		return x.ReplicationFactor
 	}
 	return 0
 }
@@ -258,11 +266,12 @@ func (*ListTopicsRequest) Descriptor() ([]byte, []int) {
 }
 
 type TopicInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Partitions    int32                  `protobuf:"varint,2,opt,name=partitions,proto3" json:"partitions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Partitions        int32                  `protobuf:"varint,2,opt,name=partitions,proto3" json:"partitions,omitempty"`
+	ReplicationFactor int32                  `protobuf:"varint,3,opt,name=replication_factor,json=replicationFactor,proto3" json:"replication_factor,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *TopicInfo) Reset() {
@@ -305,6 +314,13 @@ func (x *TopicInfo) GetName() string {
 func (x *TopicInfo) GetPartitions() int32 {
 	if x != nil {
 		return x.Partitions
+	}
+	return 0
+}
+
+func (x *TopicInfo) GetReplicationFactor() int32 {
+	if x != nil {
+		return x.ReplicationFactor
 	}
 	return 0
 }
@@ -353,19 +369,285 @@ func (x *ListTopicsResponse) GetTopics() []*TopicInfo {
 	return nil
 }
 
+type GetMetadataRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topics        []string               `protobuf:"bytes,1,rep,name=topics,proto3" json:"topics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMetadataRequest) Reset() {
+	*x = GetMetadataRequest{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMetadataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMetadataRequest) ProtoMessage() {}
+
+func (x *GetMetadataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMetadataRequest.ProtoReflect.Descriptor instead.
+func (*GetMetadataRequest) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetMetadataRequest) GetTopics() []string {
+	if x != nil {
+		return x.Topics
+	}
+	return nil
+}
+
+type GetMetadataResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Brokers       []*BrokerInfo          `protobuf:"bytes,1,rep,name=brokers,proto3" json:"brokers,omitempty"`
+	Topics        []*TopicMetadata       `protobuf:"bytes,2,rep,name=topics,proto3" json:"topics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMetadataResponse) Reset() {
+	*x = GetMetadataResponse{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMetadataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMetadataResponse) ProtoMessage() {}
+
+func (x *GetMetadataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMetadataResponse.ProtoReflect.Descriptor instead.
+func (*GetMetadataResponse) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetMetadataResponse) GetBrokers() []*BrokerInfo {
+	if x != nil {
+		return x.Brokers
+	}
+	return nil
+}
+
+func (x *GetMetadataResponse) GetTopics() []*TopicMetadata {
+	if x != nil {
+		return x.Topics
+	}
+	return nil
+}
+
+type BrokerInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BrokerInfo) Reset() {
+	*x = BrokerInfo{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BrokerInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BrokerInfo) ProtoMessage() {}
+
+func (x *BrokerInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BrokerInfo.ProtoReflect.Descriptor instead.
+func (*BrokerInfo) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *BrokerInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *BrokerInfo) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+type TopicMetadata struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Partitions        []*PartitionMetadata   `protobuf:"bytes,2,rep,name=partitions,proto3" json:"partitions,omitempty"`
+	ReplicationFactor int32                  `protobuf:"varint,3,opt,name=replication_factor,json=replicationFactor,proto3" json:"replication_factor,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *TopicMetadata) Reset() {
+	*x = TopicMetadata{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TopicMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TopicMetadata) ProtoMessage() {}
+
+func (x *TopicMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TopicMetadata.ProtoReflect.Descriptor instead.
+func (*TopicMetadata) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *TopicMetadata) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TopicMetadata) GetPartitions() []*PartitionMetadata {
+	if x != nil {
+		return x.Partitions
+	}
+	return nil
+}
+
+func (x *TopicMetadata) GetReplicationFactor() int32 {
+	if x != nil {
+		return x.ReplicationFactor
+	}
+	return 0
+}
+
+type PartitionMetadata struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	LeaderBrokerId   string                 `protobuf:"bytes,2,opt,name=leader_broker_id,json=leaderBrokerId,proto3" json:"leader_broker_id,omitempty"`
+	ReplicaBrokerIds []string               `protobuf:"bytes,3,rep,name=replica_broker_ids,json=replicaBrokerIds,proto3" json:"replica_broker_ids,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PartitionMetadata) Reset() {
+	*x = PartitionMetadata{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PartitionMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PartitionMetadata) ProtoMessage() {}
+
+func (x *PartitionMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PartitionMetadata.ProtoReflect.Descriptor instead.
+func (*PartitionMetadata) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PartitionMetadata) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *PartitionMetadata) GetLeaderBrokerId() string {
+	if x != nil {
+		return x.LeaderBrokerId
+	}
+	return ""
+}
+
+func (x *PartitionMetadata) GetReplicaBrokerIds() []string {
+	if x != nil {
+		return x.ReplicaBrokerIds
+	}
+	return nil
+}
+
 type ProduceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
-	Key           []byte                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
-	Value         []byte                 `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	Records       []*ProduceRecord       `protobuf:"bytes,2,rep,name=records,proto3" json:"records,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProduceRequest) Reset() {
 	*x = ProduceRequest{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[7]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -377,7 +659,7 @@ func (x *ProduceRequest) String() string {
 func (*ProduceRequest) ProtoMessage() {}
 
 func (x *ProduceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[7]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -390,7 +672,7 @@ func (x *ProduceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProduceRequest.ProtoReflect.Descriptor instead.
 func (*ProduceRequest) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{7}
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ProduceRequest) GetTopic() string {
@@ -400,21 +682,67 @@ func (x *ProduceRequest) GetTopic() string {
 	return ""
 }
 
-func (x *ProduceRequest) GetPartition() int32 {
+func (x *ProduceRequest) GetRecords() []*ProduceRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+type ProduceRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Partition     int32                  `protobuf:"varint,1,opt,name=partition,proto3" json:"partition,omitempty"`
+	Key           []byte                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Value         []byte                 `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProduceRecord) Reset() {
+	*x = ProduceRecord{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProduceRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProduceRecord) ProtoMessage() {}
+
+func (x *ProduceRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProduceRecord.ProtoReflect.Descriptor instead.
+func (*ProduceRecord) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ProduceRecord) GetPartition() int32 {
 	if x != nil {
 		return x.Partition
 	}
 	return 0
 }
 
-func (x *ProduceRequest) GetKey() []byte {
+func (x *ProduceRecord) GetKey() []byte {
 	if x != nil {
 		return x.Key
 	}
 	return nil
 }
 
-func (x *ProduceRequest) GetValue() []byte {
+func (x *ProduceRecord) GetValue() []byte {
 	if x != nil {
 		return x.Value
 	}
@@ -422,17 +750,18 @@ func (x *ProduceRequest) GetValue() []byte {
 }
 
 type ProduceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Offset        int64                  `protobuf:"varint,1,opt,name=offset,proto3" json:"offset,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	Partition     int32                  `protobuf:"varint,3,opt,name=partition,proto3" json:"partition,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Results []*ProduceResult       `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	Error   string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	// Set on "not leader" errors so the producer can fast-path retry.
+	LeaderBrokerId string `protobuf:"bytes,3,opt,name=leader_broker_id,json=leaderBrokerId,proto3" json:"leader_broker_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ProduceResponse) Reset() {
 	*x = ProduceResponse{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[8]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -444,7 +773,7 @@ func (x *ProduceResponse) String() string {
 func (*ProduceResponse) ProtoMessage() {}
 
 func (x *ProduceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[8]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -457,14 +786,14 @@ func (x *ProduceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProduceResponse.ProtoReflect.Descriptor instead.
 func (*ProduceResponse) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{8}
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *ProduceResponse) GetOffset() int64 {
+func (x *ProduceResponse) GetResults() []*ProduceResult {
 	if x != nil {
-		return x.Offset
+		return x.Results
 	}
-	return 0
+	return nil
 }
 
 func (x *ProduceResponse) GetError() string {
@@ -474,9 +803,61 @@ func (x *ProduceResponse) GetError() string {
 	return ""
 }
 
-func (x *ProduceResponse) GetPartition() int32 {
+func (x *ProduceResponse) GetLeaderBrokerId() string {
+	if x != nil {
+		return x.LeaderBrokerId
+	}
+	return ""
+}
+
+type ProduceResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Partition     int32                  `protobuf:"varint,1,opt,name=partition,proto3" json:"partition,omitempty"`
+	Offset        int64                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProduceResult) Reset() {
+	*x = ProduceResult{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProduceResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProduceResult) ProtoMessage() {}
+
+func (x *ProduceResult) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProduceResult.ProtoReflect.Descriptor instead.
+func (*ProduceResult) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ProduceResult) GetPartition() int32 {
 	if x != nil {
 		return x.Partition
+	}
+	return 0
+}
+
+func (x *ProduceResult) GetOffset() int64 {
+	if x != nil {
+		return x.Offset
 	}
 	return 0
 }
@@ -486,13 +867,14 @@ type ConsumeRequest struct {
 	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
 	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
 	Offset        int64                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	MaxRecords    int32                  `protobuf:"varint,4,opt,name=max_records,json=maxRecords,proto3" json:"max_records,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ConsumeRequest) Reset() {
 	*x = ConsumeRequest{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[9]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +886,7 @@ func (x *ConsumeRequest) String() string {
 func (*ConsumeRequest) ProtoMessage() {}
 
 func (x *ConsumeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[9]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +899,7 @@ func (x *ConsumeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConsumeRequest.ProtoReflect.Descriptor instead.
 func (*ConsumeRequest) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{9}
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ConsumeRequest) GetTopic() string {
@@ -541,6 +923,545 @@ func (x *ConsumeRequest) GetOffset() int64 {
 	return 0
 }
 
+func (x *ConsumeRequest) GetMaxRecords() int32 {
+	if x != nil {
+		return x.MaxRecords
+	}
+	return 0
+}
+
+type ConsumeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConsumeResponse) Reset() {
+	*x = ConsumeResponse{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConsumeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConsumeResponse) ProtoMessage() {}
+
+func (x *ConsumeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConsumeResponse.ProtoReflect.Descriptor instead.
+func (*ConsumeResponse) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ConsumeResponse) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+func (x *ConsumeResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type SubscribeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Group         string                 `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubscribeRequest) Reset() {
+	*x = SubscribeRequest{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubscribeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscribeRequest) ProtoMessage() {}
+
+func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
+func (*SubscribeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SubscribeRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *SubscribeRequest) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+type SubscribeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MemberId      string                 `protobuf:"bytes,1,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	Partitions    []int32                `protobuf:"varint,2,rep,packed,name=partitions,proto3" json:"partitions,omitempty"`
+	Generation    int64                  `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubscribeResponse) Reset() {
+	*x = SubscribeResponse{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubscribeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscribeResponse) ProtoMessage() {}
+
+func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
+func (*SubscribeResponse) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SubscribeResponse) GetMemberId() string {
+	if x != nil {
+		return x.MemberId
+	}
+	return ""
+}
+
+func (x *SubscribeResponse) GetPartitions() []int32 {
+	if x != nil {
+		return x.Partitions
+	}
+	return nil
+}
+
+func (x *SubscribeResponse) GetGeneration() int64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *SubscribeResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type PollRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Group         string                 `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	MemberId      string                 `protobuf:"bytes,3,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	MaxRecords    int32                  `protobuf:"varint,4,opt,name=max_records,json=maxRecords,proto3" json:"max_records,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PollRequest) Reset() {
+	*x = PollRequest{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PollRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PollRequest) ProtoMessage() {}
+
+func (x *PollRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PollRequest.ProtoReflect.Descriptor instead.
+func (*PollRequest) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *PollRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *PollRequest) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *PollRequest) GetMemberId() string {
+	if x != nil {
+		return x.MemberId
+	}
+	return ""
+}
+
+func (x *PollRequest) GetMaxRecords() int32 {
+	if x != nil {
+		return x.MaxRecords
+	}
+	return 0
+}
+
+type PollResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	Rebalance     bool                   `protobuf:"varint,2,opt,name=rebalance,proto3" json:"rebalance,omitempty"`
+	Generation    int64                  `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PollResponse) Reset() {
+	*x = PollResponse{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PollResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PollResponse) ProtoMessage() {}
+
+func (x *PollResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PollResponse.ProtoReflect.Descriptor instead.
+func (*PollResponse) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *PollResponse) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+func (x *PollResponse) GetRebalance() bool {
+	if x != nil {
+		return x.Rebalance
+	}
+	return false
+}
+
+func (x *PollResponse) GetGeneration() int64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *PollResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type UnsubscribeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Group         string                 `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
+	MemberId      string                 `protobuf:"bytes,3,opt,name=member_id,json=memberId,proto3" json:"member_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnsubscribeRequest) Reset() {
+	*x = UnsubscribeRequest{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnsubscribeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnsubscribeRequest) ProtoMessage() {}
+
+func (x *UnsubscribeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnsubscribeRequest.ProtoReflect.Descriptor instead.
+func (*UnsubscribeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UnsubscribeRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *UnsubscribeRequest) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *UnsubscribeRequest) GetMemberId() string {
+	if x != nil {
+		return x.MemberId
+	}
+	return ""
+}
+
+type UnsubscribeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnsubscribeResponse) Reset() {
+	*x = UnsubscribeResponse{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnsubscribeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnsubscribeResponse) ProtoMessage() {}
+
+func (x *UnsubscribeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnsubscribeResponse.ProtoReflect.Descriptor instead.
+func (*UnsubscribeResponse) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UnsubscribeResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UnsubscribeResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type ReplicateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Partition     int32                  `protobuf:"varint,2,opt,name=partition,proto3" json:"partition,omitempty"`
+	Records       []*WalRecord           `protobuf:"bytes,3,rep,name=records,proto3" json:"records,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplicateRequest) Reset() {
+	*x = ReplicateRequest{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplicateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplicateRequest) ProtoMessage() {}
+
+func (x *ReplicateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplicateRequest.ProtoReflect.Descriptor instead.
+func (*ReplicateRequest) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ReplicateRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *ReplicateRequest) GetPartition() int32 {
+	if x != nil {
+		return x.Partition
+	}
+	return 0
+}
+
+func (x *ReplicateRequest) GetRecords() []*WalRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+type ReplicateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplicateResponse) Reset() {
+	*x = ReplicateResponse{}
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplicateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplicateResponse) ProtoMessage() {}
+
+func (x *ReplicateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplicateResponse.ProtoReflect.Descriptor instead.
+func (*ReplicateResponse) Descriptor() ([]byte, []int) {
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ReplicateResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ReplicateResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 type Message struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Offset        int64                  `protobuf:"varint,1,opt,name=offset,proto3" json:"offset,omitempty"`
@@ -555,7 +1476,7 @@ type Message struct {
 
 func (x *Message) Reset() {
 	*x = Message{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[10]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -567,7 +1488,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[10]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -580,7 +1501,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{10}
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Message) GetOffset() int64 {
@@ -625,162 +1546,6 @@ func (x *Message) GetTopic() string {
 	return ""
 }
 
-type ConsumeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       *Message               `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ConsumeResponse) Reset() {
-	*x = ConsumeResponse{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ConsumeResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ConsumeResponse) ProtoMessage() {}
-
-func (x *ConsumeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ConsumeResponse.ProtoReflect.Descriptor instead.
-func (*ConsumeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *ConsumeResponse) GetMessage() *Message {
-	if x != nil {
-		return x.Message
-	}
-	return nil
-}
-
-func (x *ConsumeResponse) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
-type SubscribeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
-	Group         string                 `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscribeRequest) Reset() {
-	*x = SubscribeRequest{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribeRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribeRequest) ProtoMessage() {}
-
-func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
-func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *SubscribeRequest) GetTopic() string {
-	if x != nil {
-		return x.Topic
-	}
-	return ""
-}
-
-func (x *SubscribeRequest) GetGroup() string {
-	if x != nil {
-		return x.Group
-	}
-	return ""
-}
-
-type SubscribeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       *Message               `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscribeResponse) Reset() {
-	*x = SubscribeResponse{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscribeResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscribeResponse) ProtoMessage() {}
-
-func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
-func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *SubscribeResponse) GetMessage() *Message {
-	if x != nil {
-		return x.Message
-	}
-	return nil
-}
-
-func (x *SubscribeResponse) GetError() string {
-	if x != nil {
-		return x.Error
-	}
-	return ""
-}
-
 type WalRecord struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Offset        int64                  `protobuf:"varint,1,opt,name=offset,proto3" json:"offset,omitempty"`
@@ -793,7 +1558,7 @@ type WalRecord struct {
 
 func (x *WalRecord) Reset() {
 	*x = WalRecord{}
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[14]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -805,7 +1570,7 @@ func (x *WalRecord) String() string {
 func (*WalRecord) ProtoMessage() {}
 
 func (x *WalRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_comet_v1_broker_proto_msgTypes[14]
+	mi := &file_proto_comet_v1_broker_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -818,7 +1583,7 @@ func (x *WalRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WalRecord.ProtoReflect.Descriptor instead.
 func (*WalRecord) Descriptor() ([]byte, []int) {
-	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{14}
+	return file_proto_comet_v1_broker_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *WalRecord) GetOffset() int64 {
@@ -853,12 +1618,13 @@ var File_proto_comet_v1_broker_proto protoreflect.FileDescriptor
 
 const file_proto_comet_v1_broker_proto_rawDesc = "" +
 	"\n" +
-	"\x1bproto/comet/v1/broker.proto\x12\bcomet.v1\"H\n" +
+	"\x1bproto/comet/v1/broker.proto\x12\bcomet.v1\"w\n" +
 	"\x12CreateTopicRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
 	"partitions\x18\x02 \x01(\x05R\n" +
-	"partitions\"E\n" +
+	"partitions\x12-\n" +
+	"\x12replication_factor\x18\x03 \x01(\x05R\x11replicationFactor\"E\n" +
 	"\x13CreateTopicResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"(\n" +
@@ -867,56 +1633,120 @@ const file_proto_comet_v1_broker_proto_rawDesc = "" +
 	"\x13DeleteTopicResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\x13\n" +
-	"\x11ListTopicsRequest\"?\n" +
+	"\x11ListTopicsRequest\"n\n" +
 	"\tTopicInfo\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
 	"partitions\x18\x02 \x01(\x05R\n" +
-	"partitions\"A\n" +
+	"partitions\x12-\n" +
+	"\x12replication_factor\x18\x03 \x01(\x05R\x11replicationFactor\"A\n" +
 	"\x12ListTopicsResponse\x12+\n" +
-	"\x06topics\x18\x01 \x03(\v2\x13.comet.v1.TopicInfoR\x06topics\"l\n" +
+	"\x06topics\x18\x01 \x03(\v2\x13.comet.v1.TopicInfoR\x06topics\",\n" +
+	"\x12GetMetadataRequest\x12\x16\n" +
+	"\x06topics\x18\x01 \x03(\tR\x06topics\"v\n" +
+	"\x13GetMetadataResponse\x12.\n" +
+	"\abrokers\x18\x01 \x03(\v2\x14.comet.v1.BrokerInfoR\abrokers\x12/\n" +
+	"\x06topics\x18\x02 \x03(\v2\x17.comet.v1.TopicMetadataR\x06topics\"6\n" +
+	"\n" +
+	"BrokerInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\"\x8f\x01\n" +
+	"\rTopicMetadata\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12;\n" +
+	"\n" +
+	"partitions\x18\x02 \x03(\v2\x1b.comet.v1.PartitionMetadataR\n" +
+	"partitions\x12-\n" +
+	"\x12replication_factor\x18\x03 \x01(\x05R\x11replicationFactor\"{\n" +
+	"\x11PartitionMetadata\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12(\n" +
+	"\x10leader_broker_id\x18\x02 \x01(\tR\x0eleaderBrokerId\x12,\n" +
+	"\x12replica_broker_ids\x18\x03 \x03(\tR\x10replicaBrokerIds\"Y\n" +
 	"\x0eProduceRequest\x12\x14\n" +
-	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
-	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12\x10\n" +
-	"\x03key\x18\x03 \x01(\fR\x03key\x12\x14\n" +
-	"\x05value\x18\x04 \x01(\fR\x05value\"]\n" +
-	"\x0fProduceResponse\x12\x16\n" +
-	"\x06offset\x18\x01 \x01(\x03R\x06offset\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\x12\x1c\n" +
-	"\tpartition\x18\x03 \x01(\x05R\tpartition\"\\\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x121\n" +
+	"\arecords\x18\x02 \x03(\v2\x17.comet.v1.ProduceRecordR\arecords\"U\n" +
+	"\rProduceRecord\x12\x1c\n" +
+	"\tpartition\x18\x01 \x01(\x05R\tpartition\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\fR\x03key\x12\x14\n" +
+	"\x05value\x18\x03 \x01(\fR\x05value\"\x84\x01\n" +
+	"\x0fProduceResponse\x121\n" +
+	"\aresults\x18\x01 \x03(\v2\x17.comet.v1.ProduceResultR\aresults\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12(\n" +
+	"\x10leader_broker_id\x18\x03 \x01(\tR\x0eleaderBrokerId\"E\n" +
+	"\rProduceResult\x12\x1c\n" +
+	"\tpartition\x18\x01 \x01(\x05R\tpartition\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\x03R\x06offset\"}\n" +
 	"\x0eConsumeRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
 	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12\x16\n" +
-	"\x06offset\x18\x03 \x01(\x03R\x06offset\"\x9b\x01\n" +
+	"\x06offset\x18\x03 \x01(\x03R\x06offset\x12\x1f\n" +
+	"\vmax_records\x18\x04 \x01(\x05R\n" +
+	"maxRecords\"V\n" +
+	"\x0fConsumeResponse\x12-\n" +
+	"\bmessages\x18\x01 \x03(\v2\x11.comet.v1.MessageR\bmessages\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\">\n" +
+	"\x10SubscribeRequest\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
+	"\x05group\x18\x02 \x01(\tR\x05group\"\x86\x01\n" +
+	"\x11SubscribeResponse\x12\x1b\n" +
+	"\tmember_id\x18\x01 \x01(\tR\bmemberId\x12\x1e\n" +
+	"\n" +
+	"partitions\x18\x02 \x03(\x05R\n" +
+	"partitions\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x03 \x01(\x03R\n" +
+	"generation\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"w\n" +
+	"\vPollRequest\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
+	"\x05group\x18\x02 \x01(\tR\x05group\x12\x1b\n" +
+	"\tmember_id\x18\x03 \x01(\tR\bmemberId\x12\x1f\n" +
+	"\vmax_records\x18\x04 \x01(\x05R\n" +
+	"maxRecords\"\x91\x01\n" +
+	"\fPollResponse\x12-\n" +
+	"\bmessages\x18\x01 \x03(\v2\x11.comet.v1.MessageR\bmessages\x12\x1c\n" +
+	"\trebalance\x18\x02 \x01(\bR\trebalance\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x03 \x01(\x03R\n" +
+	"generation\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"]\n" +
+	"\x12UnsubscribeRequest\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
+	"\x05group\x18\x02 \x01(\tR\x05group\x12\x1b\n" +
+	"\tmember_id\x18\x03 \x01(\tR\bmemberId\"E\n" +
+	"\x13UnsubscribeResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"u\n" +
+	"\x10ReplicateRequest\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x1c\n" +
+	"\tpartition\x18\x02 \x01(\x05R\tpartition\x12-\n" +
+	"\arecords\x18\x03 \x03(\v2\x13.comet.v1.WalRecordR\arecords\"C\n" +
+	"\x11ReplicateResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x9b\x01\n" +
 	"\aMessage\x12\x16\n" +
 	"\x06offset\x18\x01 \x01(\x03R\x06offset\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\fR\x03key\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\fR\x05value\x12\x1c\n" +
 	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\x12\x1c\n" +
 	"\tpartition\x18\x05 \x01(\x05R\tpartition\x12\x14\n" +
-	"\x05topic\x18\x06 \x01(\tR\x05topic\"T\n" +
-	"\x0fConsumeResponse\x12+\n" +
-	"\amessage\x18\x01 \x01(\v2\x11.comet.v1.MessageR\amessage\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\">\n" +
-	"\x10SubscribeRequest\x12\x14\n" +
-	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x14\n" +
-	"\x05group\x18\x02 \x01(\tR\x05group\"V\n" +
-	"\x11SubscribeResponse\x12+\n" +
-	"\amessage\x18\x01 \x01(\v2\x11.comet.v1.MessageR\amessage\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"i\n" +
+	"\x05topic\x18\x06 \x01(\tR\x05topic\"i\n" +
 	"\tWalRecord\x12\x16\n" +
 	"\x06offset\x18\x01 \x01(\x03R\x06offset\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\fR\x03key\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\fR\x05value\x12\x1c\n" +
-	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp2\xba\x03\n" +
+	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp2\xcb\x05\n" +
 	"\rBrokerService\x12J\n" +
 	"\vCreateTopic\x12\x1c.comet.v1.CreateTopicRequest\x1a\x1d.comet.v1.CreateTopicResponse\x12J\n" +
 	"\vDeleteTopic\x12\x1c.comet.v1.DeleteTopicRequest\x1a\x1d.comet.v1.DeleteTopicResponse\x12G\n" +
 	"\n" +
-	"ListTopics\x12\x1b.comet.v1.ListTopicsRequest\x1a\x1c.comet.v1.ListTopicsResponse\x12>\n" +
-	"\aProduce\x12\x18.comet.v1.ProduceRequest\x1a\x19.comet.v1.ProduceResponse\x12@\n" +
-	"\aConsume\x12\x18.comet.v1.ConsumeRequest\x1a\x19.comet.v1.ConsumeResponse0\x01\x12F\n" +
-	"\tSubscribe\x12\x1a.comet.v1.SubscribeRequest\x1a\x1b.comet.v1.SubscribeResponse0\x01B0Z.github.com/aalyth/comet/proto/comet/v1;cometv1b\x06proto3"
+	"ListTopics\x12\x1b.comet.v1.ListTopicsRequest\x1a\x1c.comet.v1.ListTopicsResponse\x12J\n" +
+	"\vGetMetadata\x12\x1c.comet.v1.GetMetadataRequest\x1a\x1d.comet.v1.GetMetadataResponse\x12>\n" +
+	"\aProduce\x12\x18.comet.v1.ProduceRequest\x1a\x19.comet.v1.ProduceResponse\x12D\n" +
+	"\tSubscribe\x12\x1a.comet.v1.SubscribeRequest\x1a\x1b.comet.v1.SubscribeResponse\x125\n" +
+	"\x04Poll\x12\x15.comet.v1.PollRequest\x1a\x16.comet.v1.PollResponse\x12J\n" +
+	"\vUnsubscribe\x12\x1c.comet.v1.UnsubscribeRequest\x1a\x1d.comet.v1.UnsubscribeResponse\x12>\n" +
+	"\aConsume\x12\x18.comet.v1.ConsumeRequest\x1a\x19.comet.v1.ConsumeResponse\x12D\n" +
+	"\tReplicate\x12\x1a.comet.v1.ReplicateRequest\x1a\x1b.comet.v1.ReplicateResponseB0Z.github.com/aalyth/comet/proto/comet/v1;cometv1b\x06proto3"
 
 var (
 	file_proto_comet_v1_broker_proto_rawDescOnce sync.Once
@@ -930,7 +1760,7 @@ func file_proto_comet_v1_broker_proto_rawDescGZIP() []byte {
 	return file_proto_comet_v1_broker_proto_rawDescData
 }
 
-var file_proto_comet_v1_broker_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_proto_comet_v1_broker_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_proto_comet_v1_broker_proto_goTypes = []any{
 	(*CreateTopicRequest)(nil),  // 0: comet.v1.CreateTopicRequest
 	(*CreateTopicResponse)(nil), // 1: comet.v1.CreateTopicResponse
@@ -939,36 +1769,63 @@ var file_proto_comet_v1_broker_proto_goTypes = []any{
 	(*ListTopicsRequest)(nil),   // 4: comet.v1.ListTopicsRequest
 	(*TopicInfo)(nil),           // 5: comet.v1.TopicInfo
 	(*ListTopicsResponse)(nil),  // 6: comet.v1.ListTopicsResponse
-	(*ProduceRequest)(nil),      // 7: comet.v1.ProduceRequest
-	(*ProduceResponse)(nil),     // 8: comet.v1.ProduceResponse
-	(*ConsumeRequest)(nil),      // 9: comet.v1.ConsumeRequest
-	(*Message)(nil),             // 10: comet.v1.Message
-	(*ConsumeResponse)(nil),     // 11: comet.v1.ConsumeResponse
-	(*SubscribeRequest)(nil),    // 12: comet.v1.SubscribeRequest
-	(*SubscribeResponse)(nil),   // 13: comet.v1.SubscribeResponse
-	(*WalRecord)(nil),           // 14: comet.v1.WalRecord
+	(*GetMetadataRequest)(nil),  // 7: comet.v1.GetMetadataRequest
+	(*GetMetadataResponse)(nil), // 8: comet.v1.GetMetadataResponse
+	(*BrokerInfo)(nil),          // 9: comet.v1.BrokerInfo
+	(*TopicMetadata)(nil),       // 10: comet.v1.TopicMetadata
+	(*PartitionMetadata)(nil),   // 11: comet.v1.PartitionMetadata
+	(*ProduceRequest)(nil),      // 12: comet.v1.ProduceRequest
+	(*ProduceRecord)(nil),       // 13: comet.v1.ProduceRecord
+	(*ProduceResponse)(nil),     // 14: comet.v1.ProduceResponse
+	(*ProduceResult)(nil),       // 15: comet.v1.ProduceResult
+	(*ConsumeRequest)(nil),      // 16: comet.v1.ConsumeRequest
+	(*ConsumeResponse)(nil),     // 17: comet.v1.ConsumeResponse
+	(*SubscribeRequest)(nil),    // 18: comet.v1.SubscribeRequest
+	(*SubscribeResponse)(nil),   // 19: comet.v1.SubscribeResponse
+	(*PollRequest)(nil),         // 20: comet.v1.PollRequest
+	(*PollResponse)(nil),        // 21: comet.v1.PollResponse
+	(*UnsubscribeRequest)(nil),  // 22: comet.v1.UnsubscribeRequest
+	(*UnsubscribeResponse)(nil), // 23: comet.v1.UnsubscribeResponse
+	(*ReplicateRequest)(nil),    // 24: comet.v1.ReplicateRequest
+	(*ReplicateResponse)(nil),   // 25: comet.v1.ReplicateResponse
+	(*Message)(nil),             // 26: comet.v1.Message
+	(*WalRecord)(nil),           // 27: comet.v1.WalRecord
 }
 var file_proto_comet_v1_broker_proto_depIdxs = []int32{
 	5,  // 0: comet.v1.ListTopicsResponse.topics:type_name -> comet.v1.TopicInfo
-	10, // 1: comet.v1.ConsumeResponse.message:type_name -> comet.v1.Message
-	10, // 2: comet.v1.SubscribeResponse.message:type_name -> comet.v1.Message
-	0,  // 3: comet.v1.BrokerService.CreateTopic:input_type -> comet.v1.CreateTopicRequest
-	2,  // 4: comet.v1.BrokerService.DeleteTopic:input_type -> comet.v1.DeleteTopicRequest
-	4,  // 5: comet.v1.BrokerService.ListTopics:input_type -> comet.v1.ListTopicsRequest
-	7,  // 6: comet.v1.BrokerService.Produce:input_type -> comet.v1.ProduceRequest
-	9,  // 7: comet.v1.BrokerService.Consume:input_type -> comet.v1.ConsumeRequest
-	12, // 8: comet.v1.BrokerService.Subscribe:input_type -> comet.v1.SubscribeRequest
-	1,  // 9: comet.v1.BrokerService.CreateTopic:output_type -> comet.v1.CreateTopicResponse
-	3,  // 10: comet.v1.BrokerService.DeleteTopic:output_type -> comet.v1.DeleteTopicResponse
-	6,  // 11: comet.v1.BrokerService.ListTopics:output_type -> comet.v1.ListTopicsResponse
-	8,  // 12: comet.v1.BrokerService.Produce:output_type -> comet.v1.ProduceResponse
-	11, // 13: comet.v1.BrokerService.Consume:output_type -> comet.v1.ConsumeResponse
-	13, // 14: comet.v1.BrokerService.Subscribe:output_type -> comet.v1.SubscribeResponse
-	9,  // [9:15] is the sub-list for method output_type
-	3,  // [3:9] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	9,  // 1: comet.v1.GetMetadataResponse.brokers:type_name -> comet.v1.BrokerInfo
+	10, // 2: comet.v1.GetMetadataResponse.topics:type_name -> comet.v1.TopicMetadata
+	11, // 3: comet.v1.TopicMetadata.partitions:type_name -> comet.v1.PartitionMetadata
+	13, // 4: comet.v1.ProduceRequest.records:type_name -> comet.v1.ProduceRecord
+	15, // 5: comet.v1.ProduceResponse.results:type_name -> comet.v1.ProduceResult
+	26, // 6: comet.v1.ConsumeResponse.messages:type_name -> comet.v1.Message
+	26, // 7: comet.v1.PollResponse.messages:type_name -> comet.v1.Message
+	27, // 8: comet.v1.ReplicateRequest.records:type_name -> comet.v1.WalRecord
+	0,  // 9: comet.v1.BrokerService.CreateTopic:input_type -> comet.v1.CreateTopicRequest
+	2,  // 10: comet.v1.BrokerService.DeleteTopic:input_type -> comet.v1.DeleteTopicRequest
+	4,  // 11: comet.v1.BrokerService.ListTopics:input_type -> comet.v1.ListTopicsRequest
+	7,  // 12: comet.v1.BrokerService.GetMetadata:input_type -> comet.v1.GetMetadataRequest
+	12, // 13: comet.v1.BrokerService.Produce:input_type -> comet.v1.ProduceRequest
+	18, // 14: comet.v1.BrokerService.Subscribe:input_type -> comet.v1.SubscribeRequest
+	20, // 15: comet.v1.BrokerService.Poll:input_type -> comet.v1.PollRequest
+	22, // 16: comet.v1.BrokerService.Unsubscribe:input_type -> comet.v1.UnsubscribeRequest
+	16, // 17: comet.v1.BrokerService.Consume:input_type -> comet.v1.ConsumeRequest
+	24, // 18: comet.v1.BrokerService.Replicate:input_type -> comet.v1.ReplicateRequest
+	1,  // 19: comet.v1.BrokerService.CreateTopic:output_type -> comet.v1.CreateTopicResponse
+	3,  // 20: comet.v1.BrokerService.DeleteTopic:output_type -> comet.v1.DeleteTopicResponse
+	6,  // 21: comet.v1.BrokerService.ListTopics:output_type -> comet.v1.ListTopicsResponse
+	8,  // 22: comet.v1.BrokerService.GetMetadata:output_type -> comet.v1.GetMetadataResponse
+	14, // 23: comet.v1.BrokerService.Produce:output_type -> comet.v1.ProduceResponse
+	19, // 24: comet.v1.BrokerService.Subscribe:output_type -> comet.v1.SubscribeResponse
+	21, // 25: comet.v1.BrokerService.Poll:output_type -> comet.v1.PollResponse
+	23, // 26: comet.v1.BrokerService.Unsubscribe:output_type -> comet.v1.UnsubscribeResponse
+	17, // 27: comet.v1.BrokerService.Consume:output_type -> comet.v1.ConsumeResponse
+	25, // 28: comet.v1.BrokerService.Replicate:output_type -> comet.v1.ReplicateResponse
+	19, // [19:29] is the sub-list for method output_type
+	9,  // [9:19] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_proto_comet_v1_broker_proto_init() }
@@ -982,7 +1839,7 @@ func file_proto_comet_v1_broker_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_comet_v1_broker_proto_rawDesc), len(file_proto_comet_v1_broker_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

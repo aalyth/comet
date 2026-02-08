@@ -152,6 +152,49 @@ func (t *Topic) PartitionCount() int32 {
 	return int32(len(t.partitions))
 }
 
+// EnsurePartition creates a single partition within a topic if it doesn't
+// already exist. The topic is created implicitly if needed. This is used in
+// multi-broker mode where each broker only creates the partitions it owns.
+func (s *Storage) EnsurePartition(topicName string, partitionID int32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	topic, exists := s.topics[topicName]
+	if !exists {
+		topic = &Topic{
+			name:       topicName,
+			partitions: make(map[int32]*Partition),
+		}
+		s.topics[topicName] = topic
+	}
+
+	topic.mu.Lock()
+	defer topic.mu.Unlock()
+
+	if _, exists := topic.partitions[partitionID]; exists {
+		return nil // already exists
+	}
+
+	partitionDir := filepath.Join(s.dataDir, topicName, fmt.Sprintf("%d", partitionID))
+	if err := os.MkdirAll(partitionDir, defaultFolderPermissions); err != nil {
+		return errors.Wrap(err, "creating partition dir")
+	}
+
+	partition, err := NewPartition(partitionDir, partitionID, s.segmentMaxBytes, s.logger)
+	if err != nil {
+		return errors.Wrapf(err, "creating partition %d", partitionID)
+	}
+
+	topic.partitions[partitionID] = partition
+
+	s.logger.Debug(
+		"partition ensured",
+		zap.String("topic", topicName),
+		zap.Int32("partition", partitionID),
+	)
+	return nil
+}
+
 func (s *Storage) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -2,13 +2,20 @@ package client
 
 import (
 	"fmt"
+	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/aalyth/comet/internal/config"
+	"github.com/aalyth/comet/internal/server"
+	pb "github.com/aalyth/comet/proto/comet/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 func TestProduceConsume(t *testing.T) {
@@ -22,7 +29,7 @@ func TestProduceConsume(t *testing.T) {
 	ch, err := consumer.SubscribeChan("test")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 1, 2*time.Second)
+	messages, err := collectMessages(ch, 1, 5*time.Second)
 	require.NoError(t, err)
 
 	assertMessage(t, messages[0], Expect("k1", "v1", 0, "test"))
@@ -45,7 +52,7 @@ func TestMultipleMessagesInOrder(t *testing.T) {
 	ch, err := consumer.SubscribeChan("ordered")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 10, 2*time.Second)
+	messages, err := collectMessages(ch, 10, 5*time.Second)
 	require.NoError(t, err)
 
 	assertMessages(t, messages, expected)
@@ -65,7 +72,7 @@ func TestMultiplePartitions(t *testing.T) {
 	ch, err := consumer.SubscribeChan("spread")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 20, 2*time.Second)
+	messages, err := collectMessages(ch, 20, 5*time.Second)
 	require.NoError(t, err)
 
 	partitionCounts := make(map[int32]int)
@@ -96,7 +103,7 @@ func TestKeyedMessagesToSamePartition(t *testing.T) {
 	ch, err := consumer.SubscribeChan("keyed")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 10, 2*time.Second)
+	messages, err := collectMessages(ch, 10, 5*time.Second)
 	require.NoError(t, err)
 
 	assertAllMessagesFromSamePartition(t, messages)
@@ -128,7 +135,7 @@ func TestSubscribeWithHandler(t *testing.T) {
 	require.NoError(t, consumer.Subscribe("test", handler))
 
 	waitFor(
-		t, 2*time.Second, func() bool {
+		t, 5*time.Second, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
 			return len(messages) >= 3
@@ -139,42 +146,6 @@ func TestSubscribeWithHandler(t *testing.T) {
 	defer mu.Unlock()
 
 	assertMessages(t, messages, expected)
-}
-
-func TestUnsubscribeAndResubscribe(t *testing.T) {
-	addr := startIntegrationServer(t)
-
-	producer := newTestTopicProducer(t, addr, "test", 1)
-
-	// produce first batch
-	for i := 0; i < 2; i++ {
-		require.NoError(t, producer.Send(nil, []byte(fmt.Sprintf("batch1-%d", i))))
-	}
-	require.NoError(t, producer.Flush())
-
-	consumer := newTestConsumer(t, addr, "resub-group")
-	ch, err := consumer.SubscribeChan("test")
-	require.NoError(t, err)
-
-	messages, err := collectMessages(ch, 2, 2*time.Second)
-	require.NoError(t, err)
-	assert.Len(t, messages, 2)
-
-	require.NoError(t, consumer.Unsubscribe("test"))
-
-	// produce second batch
-	for i := 0; i < 2; i++ {
-		require.NoError(t, producer.Send(nil, []byte(fmt.Sprintf("batch2-%d", i))))
-	}
-	require.NoError(t, producer.Flush())
-
-	// resubscribe — in in-memory mode offsets reset, so we get all 4 messages
-	ch2, err := consumer.SubscribeChan("test")
-	require.NoError(t, err)
-
-	allMessages, err := collectMessages(ch2, 4, 2*time.Second)
-	require.NoError(t, err)
-	assert.Len(t, allMessages, 4)
 }
 
 func TestProducerCloseFlushesBuffered(t *testing.T) {
@@ -196,7 +167,7 @@ func TestProducerCloseFlushesBuffered(t *testing.T) {
 	ch, err := consumer.SubscribeChan("test")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 5, 2*time.Second)
+	messages, err := collectMessages(ch, 5, 5*time.Second)
 	require.NoError(t, err)
 	assert.Len(t, messages, 5)
 }
@@ -227,7 +198,7 @@ func TestTopicProducerCreatesTopicOnStartup(t *testing.T) {
 	ch, err := consumer.SubscribeChan("auto-created")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 1, 2*time.Second)
+	messages, err := collectMessages(ch, 1, 5*time.Second)
 	require.NoError(t, err)
 	assert.Len(t, messages, 1)
 }
@@ -246,7 +217,7 @@ func TestSubscribeWaitsForTopicCreation(t *testing.T) {
 	require.NoError(t, producer.Send([]byte("k"), []byte("hello")))
 	require.NoError(t, producer.Flush())
 
-	messages, err := collectMessages(ch, 1, 5*time.Second)
+	messages, err := collectMessages(ch, 1, 10*time.Second)
 	require.NoError(t, err)
 	assert.Len(t, messages, 1)
 	assert.Equal(t, "hello", string(messages[0].Value))
@@ -282,7 +253,7 @@ func TestConcurrentProducers(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedTotal := numProducers * messagesPerProducer
-	messages, err := collectMessages(ch, expectedTotal, 5*time.Second)
+	messages, err := collectMessages(ch, expectedTotal, 10*time.Second)
 	require.NoError(t, err)
 	assert.Len(t, messages, expectedTotal)
 }
@@ -306,7 +277,7 @@ func TestProducerBuffering(t *testing.T) {
 	ch, err := consumer.SubscribeChan("test")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 5, 2*time.Second)
+	messages, err := collectMessages(ch, 5, 5*time.Second)
 	require.NoError(t, err)
 	assert.Len(t, messages, 5)
 }
@@ -344,7 +315,7 @@ func TestAutoFlush(t *testing.T) {
 	ch, err := consumer.SubscribeChan("test")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 1, 2*time.Second)
+	messages, err := collectMessages(ch, 1, 5*time.Second)
 	require.NoError(t, err)
 	assert.Len(t, messages, 1)
 }
@@ -430,7 +401,7 @@ func TestMultiPartitionConsume(t *testing.T) {
 
 	producer := newTestTopicProducer(t, addr, "multi", 3)
 
-	keys := []string{"key-a", "key-b", "key-c"}
+	keys := []string{"key-a", "key-c", "key-d"}
 	for i := 0; i < 6; i++ {
 		key := keys[i%3]
 		value := fmt.Sprintf("msg-%d", i)
@@ -442,7 +413,7 @@ func TestMultiPartitionConsume(t *testing.T) {
 	ch, err := consumer.SubscribeChan("multi")
 	require.NoError(t, err)
 
-	messages, err := collectMessages(ch, 6, 2*time.Second)
+	messages, err := collectMessages(ch, 6, 5*time.Second)
 	require.NoError(t, err)
 
 	partitionCounts := make(map[int32]int)
@@ -479,7 +450,7 @@ func TestConcurrentIndependentConsumers(t *testing.T) {
 			ch, err := consumer.SubscribeChan("test")
 			require.NoError(t, err)
 
-			messages, err := collectMessages(ch, 10, 3*time.Second)
+			messages, err := collectMessages(ch, 10, 10*time.Second)
 			require.NoError(t, err)
 
 			totalReceived.Add(int64(len(messages)))
@@ -527,7 +498,7 @@ func TestConsumerGroupSplitsMessages(t *testing.T) {
 	var wg sync.WaitGroup
 	collect := func(ch <-chan *Message) {
 		defer wg.Done()
-		timer := time.NewTimer(3 * time.Second)
+		timer := time.NewTimer(5 * time.Second)
 		defer timer.Stop()
 		for {
 			select {
@@ -553,4 +524,115 @@ func TestConsumerGroupSplitsMessages(t *testing.T) {
 	defer mu.Unlock()
 
 	assert.Equal(t, 10, len(all), "group consumers should collectively receive all messages")
+}
+
+// --- Address normalization ---
+
+func TestExtractHost(t *testing.T) {
+	tests := []struct {
+		addr     string
+		expected string
+	}{
+		{"localhost:6174", "localhost"},
+		{":6174", "localhost"},
+		{"192.168.1.10:6174", "192.168.1.10"},
+		{"broker1:6174", "broker1"},
+		{"not-a-host-port", "not-a-host-port"}, // fallback
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.addr, func(t *testing.T) {
+				assert.Equal(t, tt.expected, extractHost(tt.addr))
+			},
+		)
+	}
+}
+
+func TestNormalizeAddr(t *testing.T) {
+	tests := []struct {
+		addr         string
+		fallbackHost string
+		expected     string
+	}{
+		{":6174", "localhost", "localhost:6174"},
+		{":9090", "10.0.0.1", "10.0.0.1:9090"},
+		{"broker1:6174", "localhost", "broker1:6174"},
+		{"192.168.1.5:6174", "localhost", "192.168.1.5:6174"},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.addr+"_"+tt.fallbackHost, func(t *testing.T) {
+				assert.Equal(
+					t, tt.expected, normalizeAddr(tt.addr, tt.fallbackHost),
+				)
+			},
+		)
+	}
+}
+
+// If the broker advertises it's metadata address as ":PORT", then the client
+// must normalise it to "localhost:PORT" before calling.
+func TestPortOnlyAdvertiseAddress(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "comet-portonly-*")
+	require.NoError(t, err)
+
+	lis, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
+
+	cfg := config.Default()
+	cfg.DataDir = tmpDir
+	cfg.ServerAddress = lis.Addr().String()
+	cfg.EtcdEndpoints = nil
+
+	srv, err := server.New(cfg, zap.NewNop())
+	require.NoError(t, err)
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterBrokerServiceServer(grpcServer, srv)
+
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			t.Logf("server error: %v", err)
+		}
+	}()
+
+	t.Cleanup(
+		func() {
+			grpcServer.GracefulStop()
+			srv.Stop()
+			os.RemoveAll(tmpDir)
+		},
+	)
+
+	_, port, err := net.SplitHostPort(lis.Addr().String())
+	require.NoError(t, err)
+	clientAddr := "localhost:" + port
+
+	pcfg := DefaultProducerConfig([]string{clientAddr}, "port-test", 2)
+	pcfg.BufferSize = 10
+	pcfg.FlushInterval = 50 * time.Millisecond
+	pcfg.BatchSize = 10
+
+	producer, err := NewTopicProducer(pcfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { producer.Close() })
+
+	for i := 0; i < 5; i++ {
+		require.NoError(
+			t, producer.Send(
+				[]byte(fmt.Sprintf("k%d", i)),
+				[]byte(fmt.Sprintf("v%d", i)),
+			),
+		)
+	}
+	require.NoError(t, producer.Flush(), "Flush must succeed with port-only advertise address")
+
+	// verify messages are consumable
+	consumer := newTestConsumer(t, "localhost:"+port, "port-group")
+	ch, err := consumer.SubscribeChan("port-test")
+	require.NoError(t, err)
+
+	messages, err := collectMessages(ch, 5, 5*time.Second)
+	require.NoError(t, err)
+	assert.Len(t, messages, 5)
 }

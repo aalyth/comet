@@ -22,21 +22,33 @@ const (
 	BrokerService_CreateTopic_FullMethodName = "/comet.v1.BrokerService/CreateTopic"
 	BrokerService_DeleteTopic_FullMethodName = "/comet.v1.BrokerService/DeleteTopic"
 	BrokerService_ListTopics_FullMethodName  = "/comet.v1.BrokerService/ListTopics"
+	BrokerService_GetMetadata_FullMethodName = "/comet.v1.BrokerService/GetMetadata"
 	BrokerService_Produce_FullMethodName     = "/comet.v1.BrokerService/Produce"
-	BrokerService_Consume_FullMethodName     = "/comet.v1.BrokerService/Consume"
 	BrokerService_Subscribe_FullMethodName   = "/comet.v1.BrokerService/Subscribe"
+	BrokerService_Poll_FullMethodName        = "/comet.v1.BrokerService/Poll"
+	BrokerService_Unsubscribe_FullMethodName = "/comet.v1.BrokerService/Unsubscribe"
+	BrokerService_Consume_FullMethodName     = "/comet.v1.BrokerService/Consume"
+	BrokerService_Replicate_FullMethodName   = "/comet.v1.BrokerService/Replicate"
 )
 
 // BrokerServiceClient is the client API for BrokerService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BrokerServiceClient interface {
+	// Admin
 	CreateTopic(ctx context.Context, in *CreateTopicRequest, opts ...grpc.CallOption) (*CreateTopicResponse, error)
 	DeleteTopic(ctx context.Context, in *DeleteTopicRequest, opts ...grpc.CallOption) (*DeleteTopicResponse, error)
 	ListTopics(ctx context.Context, in *ListTopicsRequest, opts ...grpc.CallOption) (*ListTopicsResponse, error)
+	GetMetadata(ctx context.Context, in *GetMetadataRequest, opts ...grpc.CallOption) (*GetMetadataResponse, error)
+	// Producer (batched)
 	Produce(ctx context.Context, in *ProduceRequest, opts ...grpc.CallOption) (*ProduceResponse, error)
-	Consume(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ConsumeResponse], error)
-	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeResponse], error)
+	// Consumer groups (all unary, poll-based)
+	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (*SubscribeResponse, error)
+	Poll(ctx context.Context, in *PollRequest, opts ...grpc.CallOption) (*PollResponse, error)
+	Unsubscribe(ctx context.Context, in *UnsubscribeRequest, opts ...grpc.CallOption) (*UnsubscribeResponse, error)
+	// Inter-broker
+	Consume(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (*ConsumeResponse, error)
+	Replicate(ctx context.Context, in *ReplicateRequest, opts ...grpc.CallOption) (*ReplicateResponse, error)
 }
 
 type brokerServiceClient struct {
@@ -77,6 +89,16 @@ func (c *brokerServiceClient) ListTopics(ctx context.Context, in *ListTopicsRequ
 	return out, nil
 }
 
+func (c *brokerServiceClient) GetMetadata(ctx context.Context, in *GetMetadataRequest, opts ...grpc.CallOption) (*GetMetadataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMetadataResponse)
+	err := c.cc.Invoke(ctx, BrokerService_GetMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *brokerServiceClient) Produce(ctx context.Context, in *ProduceRequest, opts ...grpc.CallOption) (*ProduceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ProduceResponse)
@@ -87,54 +109,74 @@ func (c *brokerServiceClient) Produce(ctx context.Context, in *ProduceRequest, o
 	return out, nil
 }
 
-func (c *brokerServiceClient) Consume(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ConsumeResponse], error) {
+func (c *brokerServiceClient) Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (*SubscribeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &BrokerService_ServiceDesc.Streams[0], BrokerService_Consume_FullMethodName, cOpts...)
+	out := new(SubscribeResponse)
+	err := c.cc.Invoke(ctx, BrokerService_Subscribe_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ConsumeRequest, ConsumeResponse]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type BrokerService_ConsumeClient = grpc.ServerStreamingClient[ConsumeResponse]
-
-func (c *brokerServiceClient) Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeResponse], error) {
+func (c *brokerServiceClient) Poll(ctx context.Context, in *PollRequest, opts ...grpc.CallOption) (*PollResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &BrokerService_ServiceDesc.Streams[1], BrokerService_Subscribe_FullMethodName, cOpts...)
+	out := new(PollResponse)
+	err := c.cc.Invoke(ctx, BrokerService_Poll_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[SubscribeRequest, SubscribeResponse]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type BrokerService_SubscribeClient = grpc.ServerStreamingClient[SubscribeResponse]
+func (c *brokerServiceClient) Unsubscribe(ctx context.Context, in *UnsubscribeRequest, opts ...grpc.CallOption) (*UnsubscribeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnsubscribeResponse)
+	err := c.cc.Invoke(ctx, BrokerService_Unsubscribe_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *brokerServiceClient) Consume(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (*ConsumeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ConsumeResponse)
+	err := c.cc.Invoke(ctx, BrokerService_Consume_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *brokerServiceClient) Replicate(ctx context.Context, in *ReplicateRequest, opts ...grpc.CallOption) (*ReplicateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplicateResponse)
+	err := c.cc.Invoke(ctx, BrokerService_Replicate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 // BrokerServiceServer is the server API for BrokerService service.
 // All implementations must embed UnimplementedBrokerServiceServer
 // for forward compatibility.
 type BrokerServiceServer interface {
+	// Admin
 	CreateTopic(context.Context, *CreateTopicRequest) (*CreateTopicResponse, error)
 	DeleteTopic(context.Context, *DeleteTopicRequest) (*DeleteTopicResponse, error)
 	ListTopics(context.Context, *ListTopicsRequest) (*ListTopicsResponse, error)
+	GetMetadata(context.Context, *GetMetadataRequest) (*GetMetadataResponse, error)
+	// Producer (batched)
 	Produce(context.Context, *ProduceRequest) (*ProduceResponse, error)
-	Consume(*ConsumeRequest, grpc.ServerStreamingServer[ConsumeResponse]) error
-	Subscribe(*SubscribeRequest, grpc.ServerStreamingServer[SubscribeResponse]) error
+	// Consumer groups (all unary, poll-based)
+	Subscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error)
+	Poll(context.Context, *PollRequest) (*PollResponse, error)
+	Unsubscribe(context.Context, *UnsubscribeRequest) (*UnsubscribeResponse, error)
+	// Inter-broker
+	Consume(context.Context, *ConsumeRequest) (*ConsumeResponse, error)
+	Replicate(context.Context, *ReplicateRequest) (*ReplicateResponse, error)
 	mustEmbedUnimplementedBrokerServiceServer()
 }
 
@@ -154,14 +196,26 @@ func (UnimplementedBrokerServiceServer) DeleteTopic(context.Context, *DeleteTopi
 func (UnimplementedBrokerServiceServer) ListTopics(context.Context, *ListTopicsRequest) (*ListTopicsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTopics not implemented")
 }
+func (UnimplementedBrokerServiceServer) GetMetadata(context.Context, *GetMetadataRequest) (*GetMetadataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMetadata not implemented")
+}
 func (UnimplementedBrokerServiceServer) Produce(context.Context, *ProduceRequest) (*ProduceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Produce not implemented")
 }
-func (UnimplementedBrokerServiceServer) Consume(*ConsumeRequest, grpc.ServerStreamingServer[ConsumeResponse]) error {
-	return status.Error(codes.Unimplemented, "method Consume not implemented")
+func (UnimplementedBrokerServiceServer) Subscribe(context.Context, *SubscribeRequest) (*SubscribeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Subscribe not implemented")
 }
-func (UnimplementedBrokerServiceServer) Subscribe(*SubscribeRequest, grpc.ServerStreamingServer[SubscribeResponse]) error {
-	return status.Error(codes.Unimplemented, "method Subscribe not implemented")
+func (UnimplementedBrokerServiceServer) Poll(context.Context, *PollRequest) (*PollResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Poll not implemented")
+}
+func (UnimplementedBrokerServiceServer) Unsubscribe(context.Context, *UnsubscribeRequest) (*UnsubscribeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Unsubscribe not implemented")
+}
+func (UnimplementedBrokerServiceServer) Consume(context.Context, *ConsumeRequest) (*ConsumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Consume not implemented")
+}
+func (UnimplementedBrokerServiceServer) Replicate(context.Context, *ReplicateRequest) (*ReplicateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Replicate not implemented")
 }
 func (UnimplementedBrokerServiceServer) mustEmbedUnimplementedBrokerServiceServer() {}
 func (UnimplementedBrokerServiceServer) testEmbeddedByValue()                       {}
@@ -238,6 +292,24 @@ func _BrokerService_ListTopics_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BrokerService_GetMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).GetMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BrokerService_GetMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).GetMetadata(ctx, req.(*GetMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _BrokerService_Produce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ProduceRequest)
 	if err := dec(in); err != nil {
@@ -256,27 +328,95 @@ func _BrokerService_Produce_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BrokerService_Consume_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ConsumeRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _BrokerService_Subscribe_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubscribeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(BrokerServiceServer).Consume(m, &grpc.GenericServerStream[ConsumeRequest, ConsumeResponse]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).Subscribe(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BrokerService_Subscribe_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).Subscribe(ctx, req.(*SubscribeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type BrokerService_ConsumeServer = grpc.ServerStreamingServer[ConsumeResponse]
-
-func _BrokerService_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(SubscribeRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _BrokerService_Poll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PollRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(BrokerServiceServer).Subscribe(m, &grpc.GenericServerStream[SubscribeRequest, SubscribeResponse]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).Poll(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BrokerService_Poll_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).Poll(ctx, req.(*PollRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type BrokerService_SubscribeServer = grpc.ServerStreamingServer[SubscribeResponse]
+func _BrokerService_Unsubscribe_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnsubscribeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).Unsubscribe(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BrokerService_Unsubscribe_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).Unsubscribe(ctx, req.(*UnsubscribeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BrokerService_Consume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ConsumeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).Consume(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BrokerService_Consume_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).Consume(ctx, req.(*ConsumeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BrokerService_Replicate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplicateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BrokerServiceServer).Replicate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BrokerService_Replicate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BrokerServiceServer).Replicate(ctx, req.(*ReplicateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 // BrokerService_ServiceDesc is the grpc.ServiceDesc for BrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -298,21 +438,34 @@ var BrokerService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BrokerService_ListTopics_Handler,
 		},
 		{
+			MethodName: "GetMetadata",
+			Handler:    _BrokerService_GetMetadata_Handler,
+		},
+		{
 			MethodName: "Produce",
 			Handler:    _BrokerService_Produce_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Consume",
-			Handler:       _BrokerService_Consume_Handler,
-			ServerStreams: true,
+			MethodName: "Subscribe",
+			Handler:    _BrokerService_Subscribe_Handler,
 		},
 		{
-			StreamName:    "Subscribe",
-			Handler:       _BrokerService_Subscribe_Handler,
-			ServerStreams: true,
+			MethodName: "Poll",
+			Handler:    _BrokerService_Poll_Handler,
+		},
+		{
+			MethodName: "Unsubscribe",
+			Handler:    _BrokerService_Unsubscribe_Handler,
+		},
+		{
+			MethodName: "Consume",
+			Handler:    _BrokerService_Consume_Handler,
+		},
+		{
+			MethodName: "Replicate",
+			Handler:    _BrokerService_Replicate_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/comet/v1/broker.proto",
 }

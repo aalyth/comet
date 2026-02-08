@@ -8,15 +8,91 @@ services:
     ports:
       - "2379:2379"
 
-  broker:
+  broker1:
     build: .
     ports:
       - "6174:6174"
-    command: ["-addr", ":6174", "-etcd", "etcd:2379"]
+    environment:
+      COMET_ADDR: ":6174"
+      COMET_ADVERTISE_ADDR: "broker1:6174"
+      COMET_BROKER_ID: "broker-1"
+      COMET_ETCD: "etcd:2379"
+      COMET_DATA_DIR: "/data"
     depends_on:
       - etcd
     volumes:
-      - comet-data:/data
+      - comet-data-1:/data
+
+  broker2:
+    build: .
+    ports:
+      - "6175:6174"
+    environment:
+      COMET_ADDR: ":6174"
+      COMET_ADVERTISE_ADDR: "broker2:6174"
+      COMET_BROKER_ID: "broker-2"
+      COMET_ETCD: "etcd:2379"
+      COMET_DATA_DIR: "/data"
+    depends_on:
+      - etcd
+    volumes:
+      - comet-data-2:/data
+
+  broker3:
+    build: .
+    ports:
+      - "6176:6174"
+    environment:
+      COMET_ADDR: ":6174"
+      COMET_ADVERTISE_ADDR: "broker3:6174"
+      COMET_BROKER_ID: "broker-3"
+      COMET_ETCD: "etcd:2379"
+      COMET_DATA_DIR: "/data"
+    depends_on:
+      - etcd
+    volumes:
+      - comet-data-3:/data
+
+  price-producer:
+    build:
+      context: .
+      args:
+        BUILD_TARGET: ./examples/price-producer
+    environment:
+      BROKER_ADDR: "broker1:6174,broker2:6174,broker3:6174"
+    depends_on:
+      - broker1
+      - broker2
+      - broker3
+    restart: on-failure
+
+  price-alert-1:
+    build:
+      context: .
+      args:
+        BUILD_TARGET: ./examples/price-alert
+    environment:
+      BROKER_ADDR: "broker1:6174,broker2:6174,broker3:6174"
+    depends_on:
+      - broker1
+      - broker2
+      - broker3
+    restart: on-failure
+
+  price-alert-2:
+    build:
+      context: .
+      args:
+        BUILD_TARGET: ./examples/price-alert
+    environment:
+      BROKER_ADDR: "broker1:6174,broker2:6174,broker3:6174"
+    depends_on:
+      - broker1
+      - broker2
+      - broker3
+    restart: on-failure
 
 volumes:
-  comet-data:
+  comet-data-1:
+  comet-data-2:
+  comet-data-3:

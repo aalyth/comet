@@ -65,8 +65,9 @@ func main() {
 		}
 	}()
 
-	cfg := client.DefaultProducerConfig(addr, "prices", 3)
+	cfg := client.DefaultProducerConfig(client.ParseAddresses(addr), "prices", 3)
 	cfg.Logger = logger
+	cfg.ReplicationFactor = 2
 	producer, err := client.NewTopicProducer(cfg)
 	if err != nil {
 		logger.Fatal("failed to create producer", zap.Error(err))
@@ -117,6 +118,6 @@ func main() {
 			zap.Float64("price", price),
 		)
 
-		time.Sleep(randomTimeMsBetween(50, 150))
+		time.Sleep(randomTimeMsBetween(10, 50))
 	}
 }

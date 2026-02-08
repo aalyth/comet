@@ -46,6 +46,7 @@ func (ok *offsetKey) etcdKey() string {
 type GroupMember struct {
 	ID         string
 	partitions []int32
+	generation int64
 	mu         sync.RWMutex
 }
 
@@ -63,20 +64,31 @@ func (m *GroupMember) setPartitions(partitions []int32) {
 	m.partitions = partitions
 }
 
+func (m *GroupMember) Generation() int64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.generation
+}
+
+func (m *GroupMember) setGeneration(gen int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.generation = gen
+}
+
 type consumerGroup struct {
 	mu         sync.Mutex
 	members    map[string]*GroupMember
 	numParts   int32
-	notify     chan struct{}
-	leaseID    clientv3.LeaseID
-	cancelKeep context.CancelFunc
+	generation int64
+	lastPoll   map[string]time.Time
 }
 
 func newConsumerGroup(numPartitions int32) *consumerGroup {
 	return &consumerGroup{
 		members:  make(map[string]*GroupMember),
 		numParts: numPartitions,
-		notify:   make(chan struct{}),
+		lastPoll: make(map[string]time.Time),
 	}
 }
 
@@ -85,29 +97,26 @@ type pendingOffset struct {
 	offset    int64
 }
 
-// GroupManager manages all consumer groups over the different topics. Each
-// client's offset information is stored within etcd as a form of persistence,
-// but operations work directly over an in-memory cache, where other instances
-// get synchronized proactively (via etcd watchers).
+// GroupManager manages all consumer groups. In multi-broker mode, membership
+// is coordinated via etcd. Poll-based liveness: if a member does not poll
+// within pollTimeout, it is evicted and a rebalance is triggered.
 type GroupManager struct {
-	// In-memory cache of the information for each topic's consumer groups.
-	// Data is automatically updated via etcd watchers, i.e. when another
-	// instance updates the data within etcd, we get notified to update our
-	// in-memory cache.
 	mu     sync.Mutex
 	groups map[groupKey]*consumerGroup
 
-	// For more optimal network usage, offsets are flushed periodically to
-	// etcd (not on every single update).
 	etcd                 *clientv3.Client
 	offsetCommitCount    int
 	offsetCommitInterval time.Duration
+	pollTimeout          time.Duration
 
 	pendingMu      sync.Mutex
 	pendingOffsets map[groupKey][]pendingOffset
 
-	logger *zap.Logger
+	offsetsMu sync.RWMutex
+	// memberID -> partition -> offset
+	offsets map[string]map[int32]int64
 
+	logger *zap.Logger
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -117,6 +126,7 @@ func NewGroupManager(
 	etcd *clientv3.Client,
 	offsetCommitCount int,
 	offsetCommitInterval time.Duration,
+	pollTimeout time.Duration,
 	logger *zap.Logger,
 ) *GroupManager {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -126,7 +136,9 @@ func NewGroupManager(
 		etcd:                 etcd,
 		offsetCommitCount:    offsetCommitCount,
 		offsetCommitInterval: offsetCommitInterval,
+		pollTimeout:          pollTimeout,
 		pendingOffsets:       make(map[groupKey][]pendingOffset),
+		offsets:              make(map[string]map[int32]int64),
 		logger:               l,
 		ctx:                  ctx,
 		cancel:               cancel,
@@ -135,20 +147,29 @@ func NewGroupManager(
 	gm.wg.Add(1)
 	go gm.offsetFlusher()
 
+	gm.wg.Add(1)
+	go gm.pollTimeoutChecker()
+
 	if etcd != nil {
 		gm.wg.Add(1)
 		go gm.watchMembers()
 		l.Info("etcd watcher started")
 	}
 
-	l.Info("Group manager initialized", zap.Bool("etcd", etcd != nil))
+	l.Info(
+		"Group manager initialized",
+		zap.Bool("etcd", etcd != nil),
+		zap.Duration("pollTimeout", pollTimeout),
+	)
 	return gm
 }
 
+// Join adds a member to a consumer group and triggers a rebalance. Returns the
+// member, its assigned partitions, the current generation, and a cleanup func.
 func (gm *GroupManager) Join(
 	topic, group string,
 	numPartitions int32,
-) (*GroupMember, func(), error) {
+) (*GroupMember, int64, error) {
 	gk := groupKey{topic: topic, group: group}
 	memberId := uuid.New().String()
 
@@ -166,18 +187,19 @@ func (gm *GroupManager) Join(
 	}
 	gm.mu.Unlock()
 
-	member := &GroupMember{ID: memberId}
-
 	cg.mu.Lock()
+	member := &GroupMember{ID: memberId}
 	cg.members[memberId] = member
+	cg.lastPoll[memberId] = time.Now()
 	cg.mu.Unlock()
 
 	if gm.etcd != nil {
 		if err := gm.registerMember(gk, memberId); err != nil {
 			cg.mu.Lock()
 			delete(cg.members, memberId)
+			delete(cg.lastPoll, memberId)
 			cg.mu.Unlock()
-			return nil, nil, errors.Wrap(err, "registering member in etcd")
+			return nil, 0, errors.Wrap(err, "registering member in etcd")
 		}
 	}
 
@@ -188,36 +210,137 @@ func (gm *GroupManager) Join(
 		zap.String("memberId", memberId),
 	)
 
-	gm.rebalance(gk, cg)
-	cleanup := func() {
-		cg.mu.Lock()
-		delete(cg.members, memberId)
-		cg.mu.Unlock()
+	gen := gm.rebalance(gk, cg)
+	member.setGeneration(gen)
 
-		if gm.etcd != nil {
-			etcdKey := gk.memberEtcdKey(memberId)
-			if _, err := gm.etcd.Delete(context.Background(), etcdKey); err != nil {
-				gm.logger.Error(
-					"Failed deleting etcd gk",
-					zap.String("gk", etcdKey),
-					zap.Error(err),
-				)
-			}
-		}
+	// Initialize offsets for this member.
+	gm.initMemberOffsets(memberId, topic, group, member.Partitions())
 
-		gm.logger.Info(
-			"member left",
-			zap.String("topic", topic),
-			zap.String("group", group),
-			zap.String("memberId", memberId),
-		)
-
-		gm.rebalance(gk, cg)
-	}
-
-	return member, cleanup, nil
+	return member, gen, nil
 }
 
+// Poll validates a member is alive and resets its timeout timer. Returns
+// whether a rebalance has occurred and the current generation.
+func (gm *GroupManager) Poll(
+	topic, group, memberID string,
+) (partitions []int32, rebalance bool, generation int64, err error) {
+	gk := groupKey{topic: topic, group: group}
+
+	gm.mu.Lock()
+	cg, ok := gm.groups[gk]
+	gm.mu.Unlock()
+	if !ok {
+		return nil, false, 0, fmt.Errorf("consumer group %s/%s not found", topic, group)
+	}
+
+	cg.mu.Lock()
+	member, ok := cg.members[memberID]
+	if !ok {
+		cg.mu.Unlock()
+		return nil, false, 0, fmt.Errorf(
+			"member %s not found in group %s/%s", memberID, topic, group,
+		)
+	}
+	cg.lastPoll[memberID] = time.Now()
+	gen := cg.generation
+	cg.mu.Unlock()
+
+	memberGen := member.Generation()
+	needsRebalance := memberGen != gen
+
+	if needsRebalance {
+		member.setGeneration(gen)
+		// Re-initialize offsets for new partition assignment.
+		gm.initMemberOffsets(memberID, topic, group, member.Partitions())
+	}
+
+	return member.Partitions(), needsRebalance, gen, nil
+}
+
+// Leave removes a member from its consumer group and triggers a rebalance.
+func (gm *GroupManager) Leave(topic, group, memberID string) error {
+	gk := groupKey{topic: topic, group: group}
+
+	gm.mu.Lock()
+	cg, ok := gm.groups[gk]
+	gm.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("consumer group %s/%s not found", topic, group)
+	}
+
+	cg.mu.Lock()
+	_, ok = cg.members[memberID]
+	if !ok {
+		cg.mu.Unlock()
+		return fmt.Errorf("member %s not found", memberID)
+	}
+	delete(cg.members, memberID)
+	delete(cg.lastPoll, memberID)
+	cg.mu.Unlock()
+
+	// Clean up offsets.
+	gm.offsetsMu.Lock()
+	delete(gm.offsets, memberID)
+	gm.offsetsMu.Unlock()
+
+	if gm.etcd != nil {
+		etcdKey := gk.memberEtcdKey(memberID)
+		if _, err := gm.etcd.Delete(context.Background(), etcdKey); err != nil {
+			gm.logger.Error("Failed deleting member from etcd", zap.Error(err))
+		}
+	}
+
+	gm.logger.Info(
+		"member left",
+		zap.String("topic", topic),
+		zap.String("group", group),
+		zap.String("memberId", memberID),
+	)
+
+	gm.rebalance(gk, cg)
+	return nil
+}
+
+// GetMemberOffset returns the current offset for a member's partition.
+func (gm *GroupManager) GetMemberOffset(memberID string, partition int32) int64 {
+	gm.offsetsMu.RLock()
+	defer gm.offsetsMu.RUnlock()
+	if parts, ok := gm.offsets[memberID]; ok {
+		return parts[partition]
+	}
+	return 0
+}
+
+// SetMemberOffset updates the offset for a member's partition.
+func (gm *GroupManager) SetMemberOffset(memberID string, partition int32, offset int64) {
+	gm.offsetsMu.Lock()
+	if gm.offsets[memberID] == nil {
+		gm.offsets[memberID] = make(map[int32]int64)
+	}
+	gm.offsets[memberID][partition] = offset
+	gm.offsetsMu.Unlock()
+}
+
+// SetOffset buffers an offset commit for periodic flushing to etcd.
+func (gm *GroupManager) SetOffset(topic, group string, partition int32, offset int64) {
+	key := groupKey{topic: topic, group: group}
+
+	gm.pendingMu.Lock()
+	gm.pendingOffsets[key] = append(
+		gm.pendingOffsets[key], pendingOffset{
+			partition: partition,
+			offset:    offset,
+		},
+	)
+	shouldFlush := len(gm.pendingOffsets[key]) >= gm.offsetCommitCount
+	gm.pendingMu.Unlock()
+
+	if shouldFlush {
+		gm.flushOffsets()
+	}
+}
+
+// GetOffset reads the committed offset for a partition from etcd, or 0.
 func (gm *GroupManager) GetOffset(topic, group string, partition int32) (int64, error) {
 	if gm.etcd != nil {
 		etcdKey := fmt.Sprintf(
@@ -238,50 +361,9 @@ func (gm *GroupManager) GetOffset(topic, group string, partition int32) (int64, 
 		return offset, nil
 	}
 
-	// if we're in in-memory mode only, we directly start from 0
 	return 0, nil
 }
 
-// SetOffset buffers an offset commit. It will be flushed to etcd either when
-// the batch reaches offsetCommitCount or after offsetCommitInterval.
-func (gm *GroupManager) SetOffset(topic, group string, partition int32, offset int64) {
-	key := groupKey{topic: topic, group: group}
-
-	gm.pendingMu.Lock()
-	gm.pendingOffsets[key] = append(
-		gm.pendingOffsets[key], pendingOffset{
-			partition: partition,
-			offset:    offset,
-		},
-	)
-	shouldFlush := len(gm.pendingOffsets[key]) >= gm.offsetCommitCount
-	gm.pendingMu.Unlock()
-
-	if shouldFlush {
-		gm.flushOffsets()
-	}
-}
-
-// WaitRebalance returns a channel that is closed when a rebalance occurs.
-// Callers should re-read their partition assignments after the channel fires.
-func (gm *GroupManager) WaitRebalance(topic, group string) <-chan struct{} {
-	key := groupKey{topic: topic, group: group}
-
-	gm.mu.Lock()
-	cg, ok := gm.groups[key]
-	gm.mu.Unlock()
-	if !ok {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}
-
-	cg.mu.Lock()
-	defer cg.mu.Unlock()
-	return cg.notify
-}
-
-// Close flushes pending offsets and stops background goroutines.
 func (gm *GroupManager) Close() error {
 	gm.flushOffsets()
 	gm.cancel()
@@ -290,12 +372,28 @@ func (gm *GroupManager) Close() error {
 	return nil
 }
 
-// Round-robin assignment of partitions among the group members (partition `i`
-// goes to consumer `i % len(groupMembers)`). The updates signal all `etcd`
-// waiters to update their in-memory caches.
-func (gm *GroupManager) rebalance(key groupKey, cg *consumerGroup) {
+func (gm *GroupManager) initMemberOffsets(memberID, topic, group string, partitions []int32) {
+	gm.offsetsMu.Lock()
+	offsets := make(map[int32]int64, len(partitions))
+	for _, p := range partitions {
+		offset, err := gm.GetOffset(topic, group, p)
+		if err != nil {
+			// default reading from the earliest offset
+			offset = 0
+		}
+		offsets[p] = offset
+	}
+	gm.offsets[memberID] = offsets
+	gm.offsetsMu.Unlock()
+}
+
+// rebalance uses round-robbin to assign partitions among group members.
+// Returns the new generation number.
+func (gm *GroupManager) rebalance(key groupKey, cg *consumerGroup) int64 {
 	cg.mu.Lock()
 	defer cg.mu.Unlock()
+
+	cg.generation++
 
 	memberIDs := make([]string, 0, len(cg.members))
 	for id := range cg.members {
@@ -303,7 +401,6 @@ func (gm *GroupManager) rebalance(key groupKey, cg *consumerGroup) {
 	}
 	sort.Strings(memberIDs)
 
-	// clear all assignments
 	for _, m := range cg.members {
 		m.setPartitions(nil)
 	}
@@ -319,17 +416,16 @@ func (gm *GroupManager) rebalance(key groupKey, cg *consumerGroup) {
 		}
 
 		gm.logger.Info(
-			"rebalance complete",
+			"Rebalance complete",
 			zap.String("topic", key.topic),
 			zap.String("group", key.group),
 			zap.Int("members", len(memberIDs)),
 			zap.Int32("partitions", cg.numParts),
+			zap.Int64("generation", cg.generation),
 		)
 	}
 
-	// signal rebalance by closing the old channel and creating a new one
-	close(cg.notify)
-	cg.notify = make(chan struct{})
+	return cg.generation
 }
 
 func (gm *GroupManager) registerMember(gk groupKey, memberId string) error {
@@ -341,44 +437,33 @@ func (gm *GroupManager) registerMember(gk groupKey, memberId string) error {
 	etcdKey := gk.memberEtcdKey(memberId)
 	_, err = gm.etcd.Put(gm.ctx, etcdKey, memberId, clientv3.WithLease(lease.ID))
 	if err != nil {
-		return errors.Wrap(err, "putting group member etcd gk")
+		return errors.Wrap(err, "putting group member key")
 	}
 
 	keepCtx, keepCancel := context.WithCancel(gm.ctx)
 	ch, err := gm.etcd.KeepAlive(keepCtx, lease.ID)
 	if err != nil {
 		keepCancel()
-		return fmt.Errorf("keep alive: %w", err)
+		return errors.Wrap(err, "keep alive")
 	}
 
-	// handle keepalive responses in the background.
 	gm.wg.Add(1)
 	go func() {
 		defer gm.wg.Done()
+		defer keepCancel()
 		for range ch {
 		}
 	}()
 
-	// store cancel so cleanup can stop the keepalive
-	gm.mu.Lock()
-	cg := gm.groups[gk]
-	gm.mu.Unlock()
-
-	cg.mu.Lock()
-	cg.leaseID = lease.ID
-	cg.cancelKeep = keepCancel
-	cg.mu.Unlock()
-
 	gm.logger.Debug(
 		"etcd member registered",
-		zap.String("gk", etcdKey),
+		zap.String("key", etcdKey),
 		zap.String("memberId", memberId),
 	)
 
 	return nil
 }
 
-// Watches over the memberKeyPrefix and rebalances when memers join/leave
 func (gm *GroupManager) watchMembers() {
 	defer gm.wg.Done()
 
@@ -393,8 +478,6 @@ func (gm *GroupManager) watchMembers() {
 			}
 
 			for _, ev := range resp.Events {
-				// Extract topic and group from the key:
-				// /comet/groups/<topic>/<group>/<memberID>
 				parts := strings.TrimPrefix(string(ev.Kv.Key), memberKeyPrefix)
 				segments := strings.SplitN(parts, "/", 3)
 				if len(segments) < 2 {
@@ -443,12 +526,85 @@ func (gm *GroupManager) syncMembersFromEtcd(gk groupKey, cg *consumerGroup) {
 	for id := range cg.members {
 		if !etcdMembers[id] {
 			delete(cg.members, id)
+			delete(cg.lastPoll, id)
 		}
 	}
 
 	for id := range etcdMembers {
 		if _, ok := cg.members[id]; !ok {
 			cg.members[id] = &GroupMember{ID: id}
+			cg.lastPoll[id] = time.Now()
+		}
+	}
+}
+
+func (gm *GroupManager) pollTimeoutChecker() {
+	defer gm.wg.Done()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			gm.checkPollTimeouts()
+		case <-gm.ctx.Done():
+			return
+		}
+	}
+}
+
+func (gm *GroupManager) checkPollTimeouts() {
+	gm.mu.Lock()
+	groups := make(map[groupKey]*consumerGroup, len(gm.groups))
+	for k, v := range gm.groups {
+		groups[k] = v
+	}
+	gm.mu.Unlock()
+
+	now := time.Now()
+	for gk, cg := range groups {
+		var expired []string
+
+		cg.mu.Lock()
+		for memberID, lastPoll := range cg.lastPoll {
+			if now.Sub(lastPoll) > gm.pollTimeout {
+				expired = append(expired, memberID)
+			}
+		}
+
+		for _, memberID := range expired {
+			delete(cg.members, memberID)
+			delete(cg.lastPoll, memberID)
+			gm.logger.Info(
+				"member evicted (poll timeout)",
+				zap.String("topic", gk.topic),
+				zap.String("group", gk.group),
+				zap.String("memberId", memberID),
+			)
+
+			gm.offsetsMu.Lock()
+			delete(gm.offsets, memberID)
+			gm.offsetsMu.Unlock()
+		}
+		cg.mu.Unlock()
+
+		if len(expired) > 0 {
+			// remove from etcd
+			if gm.etcd != nil {
+				for _, memberID := range expired {
+					etcdKey := gk.memberEtcdKey(memberID)
+					if _, err := gm.etcd.Delete(
+						context.Background(), etcdKey,
+					); err != nil {
+						gm.logger.Error(
+							"failed deleting expired member from etcd",
+							zap.Error(err),
+						)
+					}
+				}
+			}
+			gm.rebalance(gk, cg)
 		}
 	}
 }
@@ -469,7 +625,6 @@ func (gm *GroupManager) offsetFlusher() {
 	}
 }
 
-// Flush all pending offsets to etcd in a single transaction.
 func (gm *GroupManager) flushOffsets() {
 	gm.pendingMu.Lock()
 	pending := gm.pendingOffsets
@@ -480,7 +635,6 @@ func (gm *GroupManager) flushOffsets() {
 		return
 	}
 
-	// collect only the latest offsets per (group, topic, partition)
 	latest := make(map[offsetKey]int64)
 	for key, offsets := range pending {
 		for _, po := range offsets {
@@ -491,7 +645,6 @@ func (gm *GroupManager) flushOffsets() {
 		}
 	}
 
-	// batch a single etcd operation for the offsets
 	ops := make([]clientv3.Op, 0, len(latest))
 	for ok, offset := range latest {
 		ops = append(ops, clientv3.OpPut(ok.etcdKey(), fmt.Sprintf("%d", offset)))

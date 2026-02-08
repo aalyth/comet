@@ -5,17 +5,31 @@ package comet.v1;
 option go_package = "github.com/aalyth/comet/proto/comet/v1;cometv1";
 
 service BrokerService {
+  // Admin
   rpc CreateTopic(CreateTopicRequest) returns (CreateTopicResponse);
   rpc DeleteTopic(DeleteTopicRequest) returns (DeleteTopicResponse);
   rpc ListTopics(ListTopicsRequest) returns (ListTopicsResponse);
+  rpc GetMetadata(GetMetadataRequest) returns (GetMetadataResponse);
+
+  // Producer
   rpc Produce(ProduceRequest) returns (ProduceResponse);
-  rpc Consume(ConsumeRequest) returns (stream ConsumeResponse);
-  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+
+  // Consumer
+  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+  rpc Poll(PollRequest) returns (PollResponse);
+  rpc Unsubscribe(UnsubscribeRequest) returns (UnsubscribeResponse);
+
+  // Inter-broker
+  rpc Consume(ConsumeRequest) returns (ConsumeResponse);
+  rpc Replicate(ReplicateRequest) returns (ReplicateResponse);
 }
+
+// --- Admin messages
 
 message CreateTopicRequest {
   string name = 1;
   int32 partitions = 2;
+  int32 replication_factor = 3;
 }
 
 message CreateTopicResponse {
@@ -37,29 +51,130 @@ message ListTopicsRequest {}
 message TopicInfo {
   string name = 1;
   int32 partitions = 2;
+  int32 replication_factor = 3;
 }
 
 message ListTopicsResponse {
   repeated TopicInfo topics = 1;
 }
 
+ // --- Metadata
+
+message GetMetadataRequest {
+  repeated string topics = 1;
+}
+
+message GetMetadataResponse {
+  repeated BrokerInfo brokers = 1;
+  repeated TopicMetadata topics = 2;
+}
+
+message BrokerInfo {
+  string id = 1;
+  string address = 2;
+}
+
+message TopicMetadata {
+  string name = 1;
+  repeated PartitionMetadata partitions = 2;
+  int32 replication_factor = 3;
+}
+
+message PartitionMetadata {
+  int32 id = 1;
+  string leader_broker_id = 2;
+  repeated string replica_broker_ids = 3;
+}
+
+// --- Produce
+
 message ProduceRequest {
   string topic = 1;
-  int32 partition = 2;
-  bytes key = 3;
-  bytes value = 4;
+  repeated ProduceRecord records = 2;
+}
+
+message ProduceRecord {
+  int32 partition = 1;
+  bytes key = 2;
+  bytes value = 3;
 }
 
 message ProduceResponse {
-  int64 offset = 1;
+  repeated ProduceResult results = 1;
   string error = 2;
-  int32 partition = 3;
+  // Set on "not leader" errors so the producer can fast-path retry.
+  string leader_broker_id = 3;
 }
+
+message ProduceResult {
+  int32 partition = 1;
+  int64 offset = 2;
+}
+
+// --- Consume
 
 message ConsumeRequest {
   string topic = 1;
   int32 partition = 2;
   int64 offset = 3;
+  int32 max_records = 4;
+}
+
+message ConsumeResponse {
+  repeated Message messages = 1;
+  string error = 2;
+}
+
+// --- Consumer groups
+
+message SubscribeRequest {
+  string topic = 1;
+  string group = 2;
+}
+
+message SubscribeResponse {
+  string member_id = 1;
+  repeated int32 partitions = 2;
+  int64 generation = 3;
+  string error = 4;
+}
+
+message PollRequest {
+  string topic = 1;
+  string group = 2;
+  string member_id = 3;
+  int32 max_records = 4;
+}
+
+message PollResponse {
+  repeated Message messages = 1;
+  bool rebalance = 2;
+  int64 generation = 3;
+  string error = 4;
+}
+
+message UnsubscribeRequest {
+  string topic = 1;
+  string group = 2;
+  string member_id = 3;
+}
+
+message UnsubscribeResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+// --- Inter-broker replication
+
+message ReplicateRequest {
+  string topic = 1;
+  int32 partition = 2;
+  repeated WalRecord records = 3;
+}
+
+message ReplicateResponse {
+  bool success = 1;
+  string error = 2;
 }
 
 message Message {
@@ -69,21 +184,6 @@ message Message {
   int64 timestamp = 4;
   int32 partition = 5;
   string topic = 6;
-}
-
-message ConsumeResponse {
-  Message message = 1;
-  string error = 2;
-}
-
-message SubscribeRequest {
-  string topic = 1;
-  string group = 2;
-}
-
-message SubscribeResponse {
-  Message message = 1;
-  string error = 2;
 }
 
 message WalRecord {

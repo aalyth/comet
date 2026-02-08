@@ -19,6 +19,7 @@ const (
 	DefaultEtcdEndpoint         = "localhost:2379"
 	DefaultOffsetCommitCount    = 100
 	DefaultOffsetCommitInterval = 500 * time.Millisecond
+	DefaultPollTimeout          = 10 * time.Second
 )
 
 type Config struct {
@@ -31,6 +32,10 @@ type Config struct {
 	EtcdEndpoints        []string
 	OffsetCommitCount    int
 	OffsetCommitInterval time.Duration
+
+	BrokerID         string
+	AdvertiseAddress string
+	PollTimeout      time.Duration
 }
 
 func Default() *Config {
@@ -43,5 +48,6 @@ func Default() *Config {
 		EtcdEndpoints:        []string{DefaultEtcdEndpoint},
 		OffsetCommitCount:    DefaultOffsetCommitCount,
 		OffsetCommitInterval: DefaultOffsetCommitInterval,
+		PollTimeout:          DefaultPollTimeout,
 	}
 }
